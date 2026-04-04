@@ -37,11 +37,11 @@ function use_vim() {
 
 function create_ssh_keyfiles() {
   mkdir -p /home/kubernetes/.ssh
-  mv /opt/xforce/id_rsa /home/kubernetes/.ssh/id_rsa
+  mv /clone/Kubecon26-example-repo/aws-deployment/install/id_rsa /home/kubernetes/.ssh/id_rsa
   chmod 400 /home/kubernetes/.ssh/id_rsa
-  mv /opt/xforce/id_rsa.pub /home/kubernetes/.ssh/id_rsa.pub
+  mv /clone/Kubecon26-example-repo/aws-deployment/install/id_rsa.pub /home/kubernetes/.ssh/id_rsa.pub
   chmod 400 /home/kubernetes/.ssh/id_rsa.pub
-  mv /opt/xforce/authorized_keys /home/kubernetes/.ssh/authorized_keys
+  mv /clone/Kubecon26-example-repo/aws-deployment/install/authorized_keys /home/kubernetes/.ssh/authorized_keys
   chmod 400 /home/kubernetes/.ssh/authorized_keys
 
   systemctl daemon-reload
