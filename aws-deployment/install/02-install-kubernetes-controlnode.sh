@@ -1,5 +1,6 @@
 #!/bin/bash
 
+NODENAME=$1
 function os_update() {
   apt update 
   apt upgrade -y
@@ -49,21 +50,13 @@ function use_vim() {
   echo "export VISUAL=vim" >> /home/$USERNAME/.bashrc
 }
 
-function copy_examples() {
-  USERNAME=$1
-
-  mkdir -p /home/$USERNAME/examples
-  cp /opt/xforce/examples/* /home/$USERNAME/examples
-  chown -R $USERNAME:$USERNAME /home/$USERNAME/examples
-}
-
 function create_ssh_keyfiles() {
   mkdir -p /home/kubernetes/.ssh
-  mv /clone/Kubecon26-example-repo/aws-deployment/install/id_rsa /home/kubernetes/.ssh/id_rsa
+  mv /clone/Kubecon26-example-repo/aws-deployment/install/id_rsa-$NODENAME /home/kubernetes/.ssh/id_rsa
   chmod 400 /home/kubernetes/.ssh/id_rsa
-  mv /clone/Kubecon26-example-repo/aws-deployment/install/id_rsa.pub /home/kubernetes/.ssh/id_rsa.pub
+  mv /clone/Kubecon26-example-repo/aws-deployment/install/id_rsa-$NODENAME.pub /home/kubernetes/.ssh/id_rsa.pub
   chmod 400 /home/kubernetes/.ssh/id_rsa.pub
-  mv /clone/Kubecon26-example-repo/aws-deployment/install/authorized_keys /home/kubernetes/.ssh/authorized_keys
+  mv /clone/Kubecon26-example-repo/aws-deployment/install/authorized_keys-$NODENAME /home/kubernetes/.ssh/authorized_keys
   chmod 400 /home/kubernetes/.ssh/authorized_keys
 
   systemctl daemon-reload
@@ -205,7 +198,7 @@ function argocd_wait_for_healty() {
 }
 
 function install_external_secrets_gitops_example() {
-  cd /opt/xforce/examples
+  cd /clone
   export HOME="/root"
   git clone https://github.com/FrederiqueRetsema/external-secrets-gitops-example.git
 
@@ -322,7 +315,7 @@ os_update
 install_k9s
 install_helm
 
-change_hostname control
+change_hostname $NODENAME
 add_hostnames_to_hosts_file
 sudu_no_passwd
 

@@ -157,10 +157,10 @@ Resources:
 
           commands:
             01-initialize-files:
-              command: /opt/xforce/01-initialize-files.sh 2>&1 | tee /var/log/01-initialize-files.out
+              command: bash /opt/xforce/01-initialize-files.sh 2>&1 | tee /var/log/01-initialize-files.out
               ignoreErrors: false
             02-install-kubernetes-controlnode:
-              command: /clone/Kubecon26-example-repo/aws-deployment/install/02-install-kubernetes-controlnode.sh 2>&1 | tee /var/log/02-install-kubernetes-controlnode.out
+              command: bash /clone/Kubecon26-example-repo/aws-deployment/install/02-install-kubernetes-controlnode.sh 2>&1 | tee /var/log/02-install-kubernetes-controlnode.out
               ignoreErrors: false
     CreationPolicy:
       ResourceSignal:
@@ -234,13 +234,12 @@ Resources:
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/${DefaultPassword}/'${DefaultPassword}'/g' {} \;
-
           commands:
             01-initialize-files:
-              command: /opt/xforce/01-initialize-files.sh 2>&1 | tee /var/log/01-initialize-files.out
+              command: bash /opt/xforce/01-initialize-files.sh 2>&1 | tee /var/log/01-initialize-files.out
               ignoreErrors: false
             02-install-kubernetes-workernode2:
-              command: /clone/Kubecon26-example-repo/aws-deployment/install/02-install-kubernetes-workernode.sh 2>&1 | tee /var/log/02-install-kubernetes-workernode.out
+              command: bash /clone/Kubecon26-example-repo/aws-deployment/install/02-install-kubernetes-workernode.sh 2>&1 | tee /var/log/02-install-kubernetes-workernode.out
               ignoreErrors: false
     CreationPolicy:
       ResourceSignal:
@@ -316,10 +315,10 @@ Resources:
                 find . -type f -exec sed -i 's/${DefaultPassword}/'${DefaultPassword}'/g' {} \;
           commands:
             01-initialize-files:
-              command: /opt/xforce/01-initialize-files.sh 2>&1 | tee /var/log/01-initialize-files.out
+              command: bash /opt/xforce/01-initialize-files.sh 2>&1 | tee /var/log/01-initialize-files.out
               ignoreErrors: false
             02-install-kubernetes-workernode2:
-              command: /clone/Kubecon26-example-repo/aws-deployment/install/02-install-kubernetes-workernode2.sh 2>&1 | tee /var/log/02-install-kubernetes-workernode2.out
+              command: bash /clone/Kubecon26-example-repo/aws-deployment/install/02-install-kubernetes-workernode2.sh 2>&1 | tee /var/log/02-install-kubernetes-workernode2.out
               ignoreErrors: false
     CreationPolicy:
       ResourceSignal:
