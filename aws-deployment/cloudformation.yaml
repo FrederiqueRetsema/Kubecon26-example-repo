@@ -1,0 +1,1571 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create virtual machines for Docker and Kubernetes workshop
+
+Parameters:
+
+  Ubuntu2404AMI: 
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id
+  EC2InstanceType:
+    Type: String
+    Default: t2.large  # t2.large is 8 GiB ram, 2 vCPUs - this should be enough for a test environment
+
+  PrivateIpControl:
+    Type: String
+    Default: 172.31.0.10
+  PrivateIpWorker:
+    Type: String
+    Default: 172.31.0.11
+  PrivateIpWorker2:
+    Type: String
+    Default: 172.31.0.12
+
+  Usernames:
+    Type: String
+    Default: "User1,User2"
+  DefaultPassword:
+    Type: String
+    Default: SesamOpenU2026#
+  ConsultantName:
+    Type: String
+    Default: Frederique
+
+Mappings:
+  AWSManagedRoles:
+    SSM:
+      AmazonSSMManagedInstanceCore: "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    ECR:
+      EC2InstanceProfileForImageBuilderECRContainerBuilds: "arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilderECRContainerBuilds"
+
+Resources:
+
+  KubernetesVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: 172.31.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub "Kubernetes-workshop-${ConsultantName}"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref KubernetesVPC
+
+  ExecuteDeleteVpcFunction:
+    Type: Custom::ExecuteDeleteVpcFunction
+    Properties:
+      Vpc           : !Ref KubernetesVPC
+      ServiceToken  : !GetAtt DeleteVpcFunction.Arn
+
+  PublicSubnetAZa:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Join ["", [!Ref "AWS::Region", "a"]]
+      CidrBlock: 172.31.0.0/16
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref KubernetesVPC
+      Tags:
+        - Key: Name
+          Value: PublicSubnetAZa
+  PublicSubnetAZaRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetAZa
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+      VpcId: !Ref KubernetesVPC
+  PublicRoutePublicInternet:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  KubernetesIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - !FindInMap [ "AWSManagedRoles", "SSM", "AmazonSSMManagedInstanceCore"]
+        - !FindInMap [ "AWSManagedRoles", "ECR", "EC2InstanceProfileForImageBuilderECRContainerBuilds"]
+
+  KubernetesIAMInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref KubernetesIAMRole
+
+  KubernetesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Securitygroup for K8S
+      VpcId: !Ref KubernetesVPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 30001
+          ToPort: 30030
+          IpProtocol: TCP
+        - CidrIp: 172.31.0.0/16
+          FromPort: 0
+          ToPort: 65535
+          IpProtocol: TCP
+        - CidrIp: 172.31.0.0/16
+          FromPort: 0
+          ToPort: 65535
+          IpProtocol: UDP
+
+  KubernetesControlNode:
+    Type: AWS::EC2::Instance
+    Metadata:
+      'AWS::CloudFormation::Init':
+        config:
+          packages:
+            apt:
+              git: []
+              net-tools: []
+          files:
+            '/opt/xforce/id_rsa': 
+              content: |
+                -----BEGIN OPENSSH PRIVATE KEY-----
+                b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
+                NhAAAAAwEAAQAAAYEA+NOq1vvi+ithb64ePPvquVZdHtP7iBlQR24DbxyviCr119YseaM8
+                PeF5hGjVLbIiTIEbVuyXRLZ1ndE5/xAR2qmXyHx+X5FlMSBFWmYtRZew5+L9cYmmNaDiX0
+                CdZMh0DT3pk1vMUFsvQyywvefYFvat/2lTXkLdYLeCtlq/XxWQTUJnsiP1AYT0bSDFq08s
+                nC3aYe1FMGMlNKNeFe9+SIoYZiaUp1KA7vCFy1/TvQ1ydDESIvHkUazv0WscIaZfD/ZOdO
+                5rZ+zy/BmB1hGQHmyg0RctjDT7BMpzo7ZPvQwXJdQVT0FuP5cwkGliSEboHEPb/EeZonld
+                8qUV80LKVjDd+oDg+8QXw63PBzChrU4UhBWMVV/E00kWWm8A4lNGlHUK1wzlC0IQpVn8B7
+                bRQvNnrUxfiXnCAifblrRdsVMjAGBmqc95yuXF8biheRKcsJpN8zms3IlxbMOZ5Uo7tL9f
+                gT1iPl5MP1/Y4gm4c0BJihqgOAz9GBUOPEUizghDAAAFkCDoZmcg6GZnAAAAB3NzaC1yc2
+                EAAAGBAPjTqtb74vorYW+uHjz76rlWXR7T+4gZUEduA28cr4gq9dfWLHmjPD3heYRo1S2y
+                IkyBG1bsl0S2dZ3ROf8QEdqpl8h8fl+RZTEgRVpmLUWXsOfi/XGJpjWg4l9AnWTIdA096Z
+                NbzFBbL0MssL3n2Bb2rf9pU15C3WC3grZav18VkE1CZ7Ij9QGE9G0gxatPLJwt2mHtRTBj
+                JTSjXhXvfkiKGGYmlKdSgO7whctf070NcnQxEiLx5FGs79FrHCGmXw/2TnTua2fs8vwZgd
+                YRkB5soNEXLYw0+wTKc6O2T70MFyXUFU9Bbj+XMJBpYkhG6BxD2/xHmaJ5XfKlFfNCylYw
+                3fqA4PvEF8Otzwcwoa1OFIQVjFVfxNNJFlpvAOJTRpR1CtcM5QtCEKVZ/Ae20ULzZ61MX4
+                l5wgIn25a0XbFTIwBgZqnPecrlxfG4oXkSnLCaTfM5rNyJcWzDmeVKO7S/X4E9Yj5eTD9f
+                2OIJuHNASYoaoDgM/RgVDjxFIs4IQwAAAAMBAAEAAAGBAPMKZIs6Wzh52OEp1DVC5sEC/0
+                /WRJBqEUTDyyzjevxo4dphQu3IqFXU/0l60AajQOczEA42Z4ZhJb7xl1FwU9Ad6LiWCSW1
+                sX5rg/JJbRzVjqDg0SbuCV/GdnYNee7v8JLij1w0xPsUJbTaWQQVCbdcWRXpvdmLPAp1FI
+                KjXts0B8++9eRFRNGoGMriwNCUNAGUtAMEq5kYrkWc8JBCbjnSUQSt2HManf9FBZphTkMR
+                eGLPb2ScmqPAZDpMAZ1IjxLPIXlLds2fQsW6izXknm9+hHe8k8oApQwlA7cxlgwlJV4i3y
+                V5w9OOAQDgodmPrJBjcCgT7BzW7Ir/RKhDsJbgcnpbpZg+dYNr0Vc2zLBE4MAaBY8ldVx2
+                v2QKqdof3fU6GBFPo4blq8ORSkHS4ETROWuyCePWajfvSssTVS4J59ZeF3wxZA7iTFAZPP
+                fhteQ9grG7/zLMMY57/ynG9Utke7sB4MesGPLohe6aBecZhJUtl4lvCc45PFD5qUqaaQAA
+                AMEA4pcMVlLxhtFXSbVjS/FaRWdcKNu1vRpU6uoYo2pm8f6SuIQ6VWL7I75zuTlEepqJlm
+                oDjVGxGY4RStAQQvNSZJfZhcvUTauCkQBiNSUldU8S254gqfYp4SFxTThz01BlpKttazfU
+                0zhRz86hj0dhhOBaqNm8ffbT4dnmW+DQd+/WWZ41ceA5hdM+cpNH6PSoxZ9inCVQ8mTM8O
+                UyVBKVyUr/AUfPEAV9psCbvBsvRTNDrmz/LCRGo2095vkoi30eAAAAwQD9IONWQy+Hoxj+
+                ZEd/sQHgvX0pkLfSqkvmag1ie2tn7ZTwzZ9sYiIXPeA1fLjtW5uWTCLeE7jNn3LWOIkQTZ
+                ZAlc7zKre3xEPBm8CBXBjaIwryyiSnwqQvo1wWmwndWwSodzfWC1TR6jsBGhfLeEvtJBP2
+                abt8Un99i03vDlNO1FmjVMP0q9O2bEe30e8kSPw/94RCDg3mLN9YNjO+xB5sBKfL6Hs7wA
+                Bmjo2TwNvv/8yVCMcKuTeckVBDCJRPQL8AAADBAPumSXDhY/e3KOUiudNlfkmpcdBBvFgX
+                f88h5Y1XZKbJKvvU9yWF6Ax1j9nKyh2gIC0S3xWOW+5wGjSuCtvcpBp27bprcOlYdIMQIU
+                yAVPuufp2pNAtDP2rUmkfBReyalIheFmaPA+oTDMP0daY669PdxWhZ91vkY6JGhRhbcVSR
+                2u5Iw4UPv28I5i74G9pxFeqT19kkvRXGDkfEiYg+WUM0EIEbmlXp9mFaGFLbGgYSV77++j
+                G6YKt/KCe5I2RVfQAAABJmcmVkZXJpcXVlQGNvbnRyb2wBAgMEBQYH
+                -----END OPENSSH PRIVATE KEY-----
+              mode: "000400"
+            '/opt/xforce/id_rsa.pub': 
+              content: |
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD406rW++L6K2Fvrh48++q5Vl0e0/uIGVBHbgNvHK+IKvXX1ix5ozw94XmEaNUtsiJMgRtW7JdEtnWd0Tn/EBHaqZfIfH5fkWUxIEVaZi1Fl7Dn4v1xiaY1oOJfQJ1kyHQNPemTW8xQWy9DLLC959gW9q3/aVNeQt1gt4K2Wr9fFZBNQmeyI/UBhPRtIMWrTyycLdph7UUwYyU0o14V735IihhmJpSnUoDu8IXLX9O9DXJ0MRIi8eRRrO/Raxwhpl8P9k507mtn7PL8GYHWEZAebKDRFy2MNPsEynOjtk+9DBcl1BVPQW4/lzCQaWJIRugcQ9v8R5mieV3ypRXzQspWMN36gOD7xBfDrc8HMKGtThSEFYxVX8TTSRZabwDiU0aUdQrXDOULQhClWfwHttFC82etTF+JecICJ9uWtF2xUyMAYGapz3nK5cXxuKF5Epywmk3zOazciXFsw5nlSju0v1+BPWI+Xkw/X9jiCbhzQEmKGqA4DP0YFQ48RSLOCEM= kubernetes@control
+              mode: "000400"
+            '/opt/xforce/authorized_keys': 
+              content: |
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDKxiWvPp9yFNJ//0H/RhlgxjpJOtoPIidUhoFtIzueqaPFLbGIjFHxO7UyqtIN6AWPYqjEF7LfLdG3LGGk5zV2oIlMol66QNgKQXNZXDKYVOMK22lQEEMPctTjR1iLY/54ChwEM1fgXECol5Lnks+3FYkKwkPklHywLmC1VPawygPfPnP7RHjUyCHnNAh9yaoAD1Ga2xpyykNlTL8/HrV3iBFidrw+rXC+9CcDVVrjcwGdVNOTw6rHg9r8CKXpqWnL4jYWLIcjmjl7KbXaCkl3776YwT6mfZXUdPaJVzP3pvPsCSFW0yutbE6eVuD0r5brpzUhFjRdj8VdC/WI/Veqw1DL5KnpUbl0fJh8xZumUK2fUhBImEC81WwwwYMMqjTKeNQVmyap53Ixk0zt9Wk9quTso5gaIg9Bw5emiQPhTaJeqUvqUnGIipJD7677fRqASS3GoUyk2TjLs5KSN6+Wo0w7fIt2c/fl3QfkPrrsVkPdlbWS4k+KMQeRgAxOBsE= kubernetes@worker
+              mode: "000400"
+            '/opt/xforce/examples/kgateway/simple-pod.yaml':
+              content: |
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: nginx
+                  namespace: dev
+                  labels:
+                    app.kubernetes.io/name: MyApp
+                spec:
+                  containers:
+                  - name: nginx-container
+                    image: nginx:1.14.2
+                    ports:
+                    - containerPort: 80
+              mode: "000666"
+            '/opt/xforce/examples/kgateway/my-service.yaml':
+              content: |
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: my-service
+                  namespace: dev
+                spec:
+                  selector:
+                    app.kubernetes.io/name: MyApp
+                  ports:
+                    - protocol: TCP
+                      port: 1234
+                      targetPort: 80
+              mode: "000666"
+            '/opt/xforce/examples/kgateway/kgateway.yaml':
+              content: |
+                apiVersion: gateway.networking.k8s.io/v1
+                kind: Gateway
+                metadata:
+                  name: http
+                  namespace: kgateway-system
+                spec:
+                  gatewayClassName: kgateway
+                  listeners:
+                  - protocol: HTTP
+                    port: 8080
+                    name: http
+                    allowedRoutes:
+                      namespaces:
+                        from: All
+              mode: "000666"
+            '/opt/xforce/examples/kgateway/httproute.yaml':
+              content: |
+                # Testing:
+                # See: https://kgateway.dev/docs/envoy/latest/install/sample-app/
+                # 1) kubectl port-forward deployment/http -n kgateway-system 8080:8080
+                # 2) curl localhost:8080 -H "host: www.example2.com:8080"
+                #
+                # Connect to AWS: see
+                # https://kgateway.dev/docs/envoy/main/integrations/aws-elb/nlb/
+                
+                apiVersion: gateway.networking.k8s.io/v1
+                kind: HTTPRoute
+                metadata:
+                  name: nginx
+                  namespace: dev
+                spec:
+                  parentRefs:
+                    - name: http
+                      namespace: kgateway-system
+                  hostnames:
+                    - "www.example2.com"
+                  rules:
+                    - backendRefs:
+                        - name: my-service
+                          port: 1234
+              mode: "000666"
+            '/opt/xforce/examples/alpine-pod.yaml':
+              content: |
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: alpine
+                  namespace: dev
+                spec:
+                  containers:
+                  - name: alpine
+                    image: alpine:latest
+                    command: ['sh', '-c', 'sleep 3600']
+              mode: "000666"
+            '/opt/xforce/examples/deployment.yaml':
+              content: |
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: nginx-deployment
+                  namespace: dev
+                  labels:
+                    app: nginx
+                spec:
+                  replicas: 3
+                  selector:
+                    matchLabels:
+                      app: nginx
+                  template:
+                    metadata:
+                      labels:
+                        app: nginx
+                    spec:
+                      containers:
+                      - name: nginx
+                        image: nginx:1.14.2
+                        ports:
+                        - containerPort: 80
+              mode: "000666"
+            '/opt/xforce/examples/configmap.yaml':
+              content: |
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: hr-system-config
+                  namespace: dev
+                data:
+                  # property-like keys; each key maps to a simple value
+                  hr_service_fqdn: my-service.dev.svc.cluster.local
+
+                  # file-like keys
+                  hr.properties: |
+                    team=it4dev
+                    contact_person=Rob
+                  user-interface.properties: |
+                    color.good=purple
+                    color.bad=yellow
+                    allow.textmode=true
+              mode: "000666"         
+            '/opt/xforce/examples/pod-configmap.yaml':
+              content: |
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: pod-configmap
+                  namespace: dev
+                spec:
+                  containers:
+                    - name: test-container
+                      image: registry.k8s.io/busybox:1.27.2
+                      command: [ "/bin/sh", "-c", "env" ]
+                      env:
+                        # Define the environment variable
+                        - name: HR_SERVICE_FQDN
+                          valueFrom:
+                            configMapKeyRef:
+                              name: hr-system-config
+                              key: hr_service_fqdn
+              mode: "000666"   
+            '/opt/xforce/examples/pod-configmap-volume.yaml':
+              content: |
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: pod-configmap-volume
+                  namespace: dev
+                spec:
+                  containers:
+                    - name: test-container
+                      image: registry.k8s.io/busybox:1.27.2
+                      command: [ "/bin/sh", "-c", "sleep 3600" ]
+                      volumeMounts:
+                      - name: config-volume
+                        mountPath: /config
+                  volumes:
+                    - name: config-volume
+                      configMap:
+                        name: hr-system-config
+              mode: "000666"   
+            '/opt/xforce/examples/sidecar.yaml':
+              content: |
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: sidecar
+                  namespace: dev
+                spec:
+                  containers:
+                    - name: myapp
+                      image: alpine:latest
+                      command: ['sh', '-c', 'while true; do echo "$(date +%H:%M:%S) logging" >> /opt/logs.txt; sleep 1; done']
+                      volumeMounts:
+                        - name: data
+                          mountPath: /opt
+                    - name: logshipper
+                      image: alpine:latest
+                      command: ['sh', '-c', 'tail -F /opt/logs.txt']
+                      volumeMounts:
+                        - name: data
+                          mountPath: /opt
+                  volumes:
+                    - name: data
+                      emptyDir: {}              
+              mode: "000666"   
+            '/opt/xforce/examples/pod-secret.yaml':
+              content: |
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: pod-secret
+                  namespace: dev
+                spec:
+                  containers:
+                  - name: my-container
+                    image: registry.k8s.io/busybox:1.27.2
+                    command: [ "/bin/sh", "-c", "sleep 3600" ]
+                    volumeMounts:
+                    - name: secret-volume
+                      mountPath: /etc/secret
+                      readOnly: true
+                  volumes:
+                  - name: secret-volume
+                    secret:
+                      secretName: my-secret
+              mode: "000666"
+            '/opt/xforce/block.yaml':
+              content: |
+                apiVersion: admissionregistration.k8s.io/v1
+                kind: ValidatingAdmissionPolicy
+                metadata:
+                  name: "deny-deployment-of-workshop-resources"
+                spec:
+                  failurePolicy: Fail
+                  matchConstraints:
+                    resourceRules:
+                    - apiGroups:   ["","apps"]
+                      apiVersions: ["v1"]
+                      operations:  ["CREATE", "UPDATE"]
+                      resources:   ["pods", "services", "configmaps", "secrets", "deployments"]
+                  validations:
+                    # kind is always filled, so this policy will always fail
+                    - expression: "object.kind == ''"
+                      message: "Don't deploy resources in namespace dev or default"
+                ---
+                apiVersion: admissionregistration.k8s.io/v1
+                kind: ValidatingAdmissionPolicyBinding
+                metadata:
+                  name: "bind-deny-to-dev-and-default"
+                spec:
+                  policyName: "deny-deployment-of-workshop-resources"
+                  validationActions: [Deny]
+                  matchResources:
+                    namespaceSelector:
+                      matchLabels:
+                        block: "true"              
+              mode: "000666"
+            '/opt/xforce/block.sh':
+              content: |
+                #!/bin/bash
+                kubectl apply -f /opt/xforce/block.yaml
+                cd /opt/xforce/examples
+                ls -1 | grep -v namespace | awk '{print "kubectl delete -f "$1}' | bash
+              mode: "000555"
+            '/opt/xforce/01-install-kubernetes-controlnode.sh':
+              content: !Sub |
+                #!/bin/bash
+
+                function os_update() {
+                  apt update 
+                  apt upgrade -y
+                }
+
+                function install_k9s() {
+                  export HOME="/root"
+
+                  curl -sS https://webinstall.dev/k9s | bash
+                  cp ~/.local/bin/k9s /usr/local/bin
+                }
+
+                function install_helm() {
+                  curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
+                  chmod 700 get_helm.sh
+                  ./get_helm.sh
+                }
+
+                function change_hostname() {
+                  hostname=$1
+                  echo $hostname > /etc/hostname
+                  hostname $hostname
+                }
+
+                function add_hostnames_to_hosts_file() {
+                  echo "172.31.0.10 control" >> /etc/hosts
+                  echo "172.31.0.11 worker" >> /etc/hosts
+                  echo "172.31.0.12 worker2" >> /etc/hosts
+                }
+
+                function sudu_no_passwd() {
+                  groupadd admin
+                  sed -i "s/%admin ALL=(ALL) ALL/%admin ALL=(ALL) NOPASSWD: ALL/" /etc/sudoers 
+                }
+
+                function add_user() {
+                  USERNAME=$1
+
+                  echo /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME > /var/log/useradd.txt
+                  /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME 
+                  echo -e "${DefaultPassword}\n${DefaultPassword}" | passwd $USERNAME
+                }
+
+                function use_vim() {
+                  USERNAME=$1
+
+                  echo "export VISUAL=vim" >> /home/$USERNAME/.bashrc
+                }
+
+                function copy_examples() {
+                  USERNAME=$1
+
+                  mkdir -p /home/$USERNAME/examples
+                  cp /opt/xforce/examples/* /home/$USERNAME/examples
+                  chown -R $USERNAME:$USERNAME /home/$USERNAME/examples
+                }
+
+                function create_ssh_keyfiles() {
+                  mkdir -p /home/kubernetes/.ssh
+                  mv /opt/xforce/id_rsa /home/kubernetes/.ssh/id_rsa
+                  chmod 400 /home/kubernetes/.ssh/id_rsa
+                  mv /opt/xforce/id_rsa.pub /home/kubernetes/.ssh/id_rsa.pub
+                  chmod 400 /home/kubernetes/.ssh/id_rsa.pub
+                  mv /opt/xforce/authorized_keys /home/kubernetes/.ssh/authorized_keys
+                  chmod 400 /home/kubernetes/.ssh/authorized_keys
+
+                  systemctl daemon-reload
+                  systemctl restart ssh
+                }
+
+                function install_kubernetes_control() {
+                  mkdir -p /opt/kubernetes
+                  cd /opt/kubernetes
+
+                  apt update && apt upgrade -y
+                  apt install openssh-server -y
+                  systemctl enable --now ssh
+                  ufw allow ssh
+                  ufw reload
+                  sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+                  LINE_NO=$(grep -n swap /etc/fstab | awk -F':' '{print $1}')
+                  sed -i "$LINE_NO""d" /etc/fstab 
+                  swapoff -a
+
+                  echo "overlay" > /etc/modules-load.d/k8s.conf
+                  echo "br_netfilter" >> /etc/modules-load.d/k8s.conf
+                  modprobe overlay
+                  modprobe br_netfilter
+
+                  echo "net.bridge.bridge-nf-call-iptables  = 1" > /etc/sysctl.d/k8s.conf
+                  echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/k8s.conf
+                  echo "net.ipv4.ip_forward                 = 1" >> /etc/sysctl.d/k8s.conf
+
+                  sysctl --system
+
+                  mkdir -p /usr/local/lib/systemd/system
+                  cd /tmp
+                  curl -OL https://github.com/containerd/containerd/releases/download/v2.2.2/containerd-2.2.2-linux-amd64.tar.gz
+                  tar Cxzvf /usr/local containerd-2.2.2-linux-amd64.tar.gz
+
+                  curl -OL https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+                  cp containerd.service /usr/local/lib/systemd/system/containerd.service
+
+                  curl -OL https://github.com/opencontainers/runc/releases/download/v1.3.5/runc.amd64
+                  install -m 755 runc.amd64 /usr/local/sbin/runc
+
+                  curl -OL https://github.com/containernetworking/plugins/releases/download/v1.9.1/cni-plugins-linux-amd64-v1.9.1.tgz
+                  mkdir -p /opt/cni/bin
+                  tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.9.1.tgz
+
+                  systemctl daemon-reload
+                  systemctl enable --now containerd
+                  
+                  mkdir -p /etc/containerd
+                  containerd config default | tee /etc/containerd/config.toml
+
+                  apt-get install -y apt-transport-https ca-certificates curl gpg
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl.sha256"
+
+                  # Link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+                  mkdir -p -m 755 /etc/apt/keyrings
+                  curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+                  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+                  apt update
+                  apt-get install -y kubelet kubeadm kubectl
+                  apt-mark hold kubelet kubeadm kubectl
+
+                  systemctl enable --now kubelet
+
+                  kubeadm init
+                  kubeadm token create --print-join-command > /home/kubernetes/join-cmd.sh
+                }
+
+                function make_it_possible_for_a_user_to_use_kubectl() {
+                  USER=$1
+
+                  mkdir -p /home/$USER/.kube
+                  cp /etc/kubernetes/admin.conf /home/$USER/.kube/config
+                  chown $(id -u $USER):$(id -g $USER) /home/$USER/.kube/config
+                }
+
+                function make_it_possible_to_use_kubectl() {
+                  for USER in $(echo ${Usernames} | tr "," "\n")
+                  do
+                      make_it_possible_for_a_user_to_use_kubectl $USER
+                  done
+                  export KUBECONFIG=/etc/kubernetes/admin.conf
+                }
+
+                function change_permissions() {
+                  chown kubernetes:kubernetes -R /home/kubernetes
+                  chown kubernetes:kubernetes -R /opt
+                }
+
+                function install_cilium() {
+                  CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+                  CLI_ARCH=amd64
+                  if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+                  curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/$CILIUM_CLI_VERSION/cilium-linux-$CLI_ARCH.tar.gz{,.sha256sum}
+                  sha256sum --check cilium-linux-$CLI_ARCH.tar.gz.sha256sum
+                  sudo tar xzvfC cilium-linux-$CLI_ARCH.tar.gz /usr/local/bin
+                  rm cilium-linux-$CLI_ARCH.tar.gz{,.sha256sum}
+
+                  cilium install --set securityContext.privileged=true
+                }
+
+                function install_kgateway() {
+                  helm install kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds --version v2.2.2 --namespace kgateway-system --create-namespace
+                  helm install kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --version v2.2.2 --namespace kgateway-system --create-namespace
+                  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+                }
+
+                function install_argocd() {                  
+                  cd /tmp
+                  kubectl create namespace argocd
+                  kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+                  
+                  curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                  install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
+                  rm argocd-linux-amd64
+                }
+
+                function argocd_wait_for_healty() {
+                  APP=$1
+
+                  argocd app list | tee /tmp/$$
+                  if [[ ! -z "$(cat /tmp/$$ | grep "$APP" | awk '{print $5}' | grep OutOfSync)" ]]
+                  then
+                    echo "Sync $APP"
+                    argocd app sync $APP >/dev/null 2>&1
+                  fi
+
+                  while true
+                  do
+                      argocd app list | tee /tmp/$$
+                      if [[ ! -z "$(cat /tmp/$$ | grep "$APP" | awk '{print $6}' | grep Healthy)" ]]
+                      then
+                        break
+                      fi
+                      echo "Wait another 10 seconds"
+                      sleep 10
+                  done
+                }
+
+                function install_external_secrets_gitops_example() {
+                  cd /opt/xforce/examples
+                  export HOME="/root"
+                  git clone https://github.com/FrederiqueRetsema/external-secrets-gitops-example.git
+
+                  ARGOCD_PWD=$(argocd admin initial-password -n argocd | head -n 1)
+                  ARGOCD_IP=$(kubectl get svc -n argocd argocd-server | tail -n 1 | awk '{print $3}')
+                  echo "Pwd admin = $ARGOCD_PWD"
+
+                  argocd login $ARGOCD_IP:80 --username admin --password $ARGOCD_PWD --insecure
+                  argocd app create vault \
+                  --project default \
+                  --repo https://helm.releases.hashicorp.com \
+                  --helm-chart vault \
+                  --revision 0.28.0 \
+                  --sync-policy auto \
+                  --sync-option CreateNamespace=true \
+                  --parameter server.dev.enabled=true \
+                  --dest-namespace vault \
+                  --dest-server https://kubernetes.default.svc
+
+                  argocd_wait_for_healty vault
+
+                  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
+                vault login root
+                EOF
+                  sleep 2
+                  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
+
+                # Write the demo credentials
+                vault kv put secret/mysql_credentials \
+                  url="mysql.example.com:3306" \
+                  username="my_demo_user" \
+                  password="my_demo_password"
+                EOF
+                  sleep 2
+                  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
+
+                # Enable Kubernetes auth
+                vault auth enable kubernetes
+                vault write auth/kubernetes/config \
+                  kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT"
+                EOF
+                  sleep 2
+                  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
+
+                # Policy and role for ESO
+                vault policy write eso-read-policy - <<EOF2
+                path "secret/*" {
+                  capabilities = [ "read", "list" ]
+                }
+                EOF2
+                EOF
+                  sleep 2
+                  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
+                vault write auth/kubernetes/role/demo \
+                  bound_service_account_names=* \
+                  bound_service_account_namespaces=* \
+                  policies=eso-read-policy \
+                  ttl=24h
+
+                exit
+                EOF
+
+                  sleep 10
+
+                  argocd app create eso \
+                  --project default \
+                  --repo https://charts.external-secrets.io \
+                  --helm-chart external-secrets \
+                  --revision 0.9.19 \
+                  --sync-policy auto \
+                  --sync-option CreateNamespace=true \
+                  --dest-namespace external-secrets \
+                  --dest-server https://kubernetes.default.svc
+
+                  argocd_wait_for_healty eso
+
+                  argocd app create vault-secret-store \
+                  --project default \
+                  --repo https://github.com/FrederiqueRetsema/external-secrets-gitops-example.git \
+                  --path "./manifests/vault-integration" \
+                  --sync-policy auto \
+                  --dest-namespace external-secrets \
+                  --dest-server https://kubernetes.default.svc
+
+                  argocd_wait_for_healty vault-secret-store
+                  sleep 5
+
+                  echo "Should show READY: True"
+                  kubectl get clustersecretstore vault-backend  # should show READY: True
+                  
+                  argocd app create my-secret-app \
+                  --project default \
+                  --repo https://github.com/FrederiqueRetsema/external-secrets-gitops-example.git \
+                  --path "./manifests/app" \
+                  --sync-policy auto \
+                  --dest-namespace default \
+                  --dest-server https://kubernetes.default.svc                  
+                }
+
+                function allow_external_access() {
+                  NAMESPACE=$1
+                  SERVICE=$2
+                  EXTERNAL_PORT=$3
+
+                  kubectl patch svc "$SERVICE" -n "$NAMESPACE" -p '{"spec": {"type": "NodePort"}}'
+                  kubectl patch svc "$SERVICE" -n "$NAMESPACE" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/0/nodePort\", \"value\":$EXTERNAL_PORT}]"
+                }
+
+                function force_password_change() {
+                  passwd -e kubernetes
+                }
+
+                os_update
+                install_k9s
+                install_helm
+
+                change_hostname control
+                add_hostnames_to_hosts_file
+                sudu_no_passwd
+
+                for USER in $(echo ${Usernames} | tr "," "\n")
+                do
+                        add_user $USER
+                        use_vim $USER
+                        copy_examples $USER
+                done
+                add_user kubernetes
+                use_vim kubernetes
+                use_vim root
+
+                create_ssh_keyfiles
+                change_permissions
+
+                install_kubernetes_control
+                make_it_possible_to_use_kubectl
+                change_permissions
+                echo wait 30 seconds
+                sleep 30
+                install_cilium
+                install_kgateway
+                install_argocd
+
+                echo $(date +%H:%M:%S) wait 3 minutes
+                sleep 180
+                install_external_secrets_gitops_example
+                allow_external_access argocd argocd-server 30007
+                allow_external_access vault vault 30008
+                allow_external_access default gitops-secrets-service 30001
+                force_password_change
+              mode: "000500"
+          commands:
+            01-install-kubernetes-controlnode:
+              command: /opt/xforce/01-install-kubernetes-controlnode.sh 2>&1 | tee /var/log/01-install-kubernetes-controlnode.out
+              ignoreErrors: false
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+    Properties:
+      ImageId: !Ref Ubuntu2404AMI
+      InstanceType: !Ref EC2InstanceType
+      IamInstanceProfile: !Ref KubernetesIAMInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1 # Or /dev/sda1 depending on AMI
+          Ebs:
+            VolumeSize: '50' # Size in GB
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: KubernetesControlNode
+      SecurityGroupIds:
+        - !Ref KubernetesSecurityGroup
+      SubnetId: !Ref PublicSubnetAZa
+      PrivateIpAddress: !Ref PrivateIpControl
+      UserData: 
+        "Fn::Base64": 
+          !Sub |
+            #!/bin/bash
+            # ===
+            # Source: https://gist.github.com/b0tting/f1a83a8ecca42ae37cc2c40d6174cead - used to install cfn-init and cfn-signal
+            export DEBIAN_FRONTEND=noninteractive
+            export VENV_DIR=/opt/aws/cfn-bootstrap-venv
+            export HELPER_SCRIPTS_BIN_DIR=/opt/aws/bin
+
+            # Install python 3.11 from deadsnakes, this will not be the default python, that will stay on 3.12
+            apt update	
+            apt-get install -y tzdata software-properties-common
+            add-apt-repository -y ppa:deadsnakes/ppa 
+            apt update
+            apt install -y python3.11 python3.11-venv 
+
+            # Set up a virtual env
+            mkdir -p $VENV_DIR	
+            python3.11 -m venv $VENV_DIR	
+            source $VENV_DIR/bin/activate
+
+            # Install the CFN helper scripts. These will link to the virtual environment & 3.11, not touching the 
+            # system standard python 3.12
+            pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+            mkdir -p $HELPER_SCRIPTS_BIN_DIR	
+            ln -s $VENV_DIR/bin/cfn-* $HELPER_SCRIPTS_BIN_DIR
+            deactivate
+            #===
+
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource KubernetesControlNode --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource KubernetesControlNode --region ${AWS::Region}
+
+  KubernetesWorkerNode:
+    Type: AWS::EC2::Instance
+    Metadata:
+      'AWS::CloudFormation::Init':
+        config:
+          packages:
+            apt:
+              git: []
+          files:
+            '/opt/xforce/id_rsa': 
+              content: |
+                -----BEGIN OPENSSH PRIVATE KEY-----
+                b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
+                NhAAAAAwEAAQAAAYEAysYlrz6fchTSf/9B/0YZYMY6STraDyInVIaBbSM7nqmjxS2xiIxR
+                8Tu1MqrSDegFj2KoxBey3y3RtyxhpOc1dqCJTKJeukDYCkFzWVwymFTjCttpUBBDD3LU40
+                dYi2P+eAocBDNX4FxAqJeS55LPtxWJCsJD5JR8sC5gtVT2sMoD3z5z+0R41Mgh5zQIfcmq
+                AA9RmtsacspDZUy/Px61d4gRYna8Pq1wvvQnA1Va43MBnVTTk8Oqx4Pa/Ail6alpy+I2Fi
+                yHI5o5eym12gpJd+++mME+pn2V1HT2iVcz96bz7AkhVtMrrWxOnlbg9K+W66c1IRY0XY/F
+                XQv1iP1XqsNQy+Sp6VG5dHyYfMWbplCtn1IQSJhAvNVsMMGDDKo0ynjUFZsmqedyMZNM7f
+                VpPark7KOYGiIPQcOXpokD4U2iXqlL6lJxiIqSQ++u+30agEktxqFMpNk4y7OSkjevlqNM
+                O3yLdnP35d0H5D667FZD3ZW1kuJPijEHkYAMTgbBAAAFiLLgLCSy4CwkAAAAB3NzaC1yc2
+                EAAAGBAMrGJa8+n3IU0n//Qf9GGWDGOkk62g8iJ1SGgW0jO56po8UtsYiMUfE7tTKq0g3o
+                BY9iqMQXst8t0bcsYaTnNXagiUyiXrpA2ApBc1lcMphU4wrbaVAQQw9y1ONHWItj/ngKHA
+                QzV+BcQKiXkueSz7cViQrCQ+SUfLAuYLVU9rDKA98+c/tEeNTIIec0CH3JqgAPUZrbGnLK
+                Q2VMvz8etXeIEWJ2vD6tcL70JwNVWuNzAZ1U05PDqseD2vwIpempacviNhYshyOaOXsptd
+                oKSXfvvpjBPqZ9ldR09olXM/em8+wJIVbTK61sTp5W4PSvluunNSEWNF2PxV0L9Yj9V6rD
+                UMvkqelRuXR8mHzFm6ZQrZ9SEEiYQLzVbDDBgwyqNMp41BWbJqnncjGTTO31aT2q5OyjmB
+                oiD0HDl6aJA+FNol6pS+pScYiKkkPvrvt9GoBJLcahTKTZOMuzkpI3r5ajTDt8i3Zz9+Xd
+                B+Q+uuxWQ92VtZLiT4oxB5GADE4GwQAAAAMBAAEAAAGAKfxxXSH4XeTV2U7/WV4obxNcik
+                E3WZ7Wyfe34ONEuwuhL3jQo9d6OBsG3+Di8aIzVIc3LrNBhFi2bdkwtrZxKYkAJPAR8Trw
+                AN+ghMZEa6pYAK2B1uQnHpHGZvEk8mfYDv744h3HeltfwAjykCSkAeLhp2qmKDRexRQ1Th
+                azpdOOjbEezs5UvqpZ6sepYnJZUv3ZBdmMVmxvHBCSIP240XFJODwhqlC7Ya6oTVZlJWdw
+                1CT2UkhXmkxBEaKwx/sd4AeJRcY7PygpjGvrwfyU3qJVOduHiTrNFH9dUVw7ffN1rZPrrq
+                bU81LQHAUoTRJfiTtga4Ao1dnR6t+2wevxkHofvqVL6R1D/Wx+uP13O442TBs9jHYliYOf
+                neJpQk6vKJ+AQa2hX1oJHhLcmuaPL9jNIIimsX+sxkmcbN96OPhSSvsZSie9PaIET7H1jT
+                luoq61JmI8O4kpKpb8R9bK9W8lkKZIeTI1I2yamYTMUGq3zruZa+IAV333z6kyG3OJAAAA
+                wQCPSQm7IdV2wzSMXVo+DmIu936OfPAdqFsMjg9T744mziXohIY5fWy01hsQfy1iCQVmQC
+                ju+KXmDadDNh9zPNUKxVOk4ehdcNVnHVW4uFHyTuaPiZDC/VnR6ojc8mpllwt2FdX6sGm7
+                JHE6L87nmHS6aZRrMrtnqk0780bqux0ENIynRRE2x6d5zVXSt6H8qwG7jkMO2EICP4bvfy
+                vw766gQ54Yt079Sav6YCf0vj6qllWqy5h0pYWOWXPbHDe+IQUAAADBAP1+HUzRTAHPdmOY
+                MwAfRI/wYwff1fe98Z58LfiPRt0Hhgef9vc/h6f5agc/xV8ll59WipvED+xn0ZK2pT084V
+                63vL7WCyQaHDEXwfx3iffnzWyA/Og/8RnNITbuAvnyB3s9SdIhNwhOpPycw+UPUJM+qnfZ
+                BN53acLKqt+pYEc1UlhBdSdTAQeQUa0xhi+qReUZVVHPqipinAjYuS++Hgv8qRmFLYw+Jw
+                W6PNHVa1HpeUrVu58f/n8dGwaCFwI5lwAAAMEAzMea0XCkfItmTWG9v/2t8+XHeJFk+IFE
+                du9auBERsuwHXAX8jtfTq/T/ZpU76ifGGz+eWuauHqCn5tOal/3SPOIvG6ObSpv+Z960Ns
+                2EjP25ezEuZZhgi+G/uQFIhUUIww1XdNRkuj70+PjmRVId07zW767bonmEN/TpfDUKLqD8
+                UI6e3AgEANwICVzBA/xC0G/NMS4ZmOKonPiGxwsnlzaPNwXL3up//R4dPwUaOswEsDDTIz
+                JotbA3SyvOC11nAAAAEWZyZWRlcmlxdWVAd29ya2VyAQ==
+                -----END OPENSSH PRIVATE KEY-----
+              mode: 000400
+            '/opt/xforce/id_rsa.pub': 
+              content: !Sub |
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDKxiWvPp9yFNJ//0H/RhlgxjpJOtoPIidUhoFtIzueqaPFLbGIjFHxO7UyqtIN6AWPYqjEF7LfLdG3LGGk5zV2oIlMol66QNgKQXNZXDKYVOMK22lQEEMPctTjR1iLY/54ChwEM1fgXECol5Lnks+3FYkKwkPklHywLmC1VPawygPfPnP7RHjUyCHnNAh9yaoAD1Ga2xpyykNlTL8/HrV3iBFidrw+rXC+9CcDVVrjcwGdVNOTw6rHg9r8CKXpqWnL4jYWLIcjmjl7KbXaCkl3776YwT6mfZXUdPaJVzP3pvPsCSFW0yutbE6eVuD0r5brpzUhFjRdj8VdC/WI/Veqw1DL5KnpUbl0fJh8xZumUK2fUhBImEC81WwwwYMMqjTKeNQVmyap53Ixk0zt9Wk9quTso5gaIg9Bw5emiQPhTaJeqUvqUnGIipJD7677fRqASS3GoUyk2TjLs5KSN6+Wo0w7fIt2c/fl3QfkPrrsVkPdlbWS4k+KMQeRgAxOBsE= kubernetes@worker
+              mode: 000400
+            '/opt/xforce/authorized_keys': 
+              content: !Sub |
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD406rW++L6K2Fvrh48++q5Vl0e0/uIGVBHbgNvHK+IKvXX1ix5ozw94XmEaNUtsiJMgRtW7JdEtnWd0Tn/EBHaqZfIfH5fkWUxIEVaZi1Fl7Dn4v1xiaY1oOJfQJ1kyHQNPemTW8xQWy9DLLC959gW9q3/aVNeQt1gt4K2Wr9fFZBNQmeyI/UBhPRtIMWrTyycLdph7UUwYyU0o14V735IihhmJpSnUoDu8IXLX9O9DXJ0MRIi8eRRrO/Raxwhpl8P9k507mtn7PL8GYHWEZAebKDRFy2MNPsEynOjtk+9DBcl1BVPQW4/lzCQaWJIRugcQ9v8R5mieV3ypRXzQspWMN36gOD7xBfDrc8HMKGtThSEFYxVX8TTSRZabwDiU0aUdQrXDOULQhClWfwHttFC82etTF+JecICJ9uWtF2xUyMAYGapz3nK5cXxuKF5Epywmk3zOazciXFsw5nlSju0v1+BPWI+Xkw/X9jiCbhzQEmKGqA4DP0YFQ48RSLOCEM= kubernetes@control
+              mode: 000400
+            '/opt/xforce/01-install-kubernetes-workernode.sh':
+              content: !Sub |
+                #!/bin/bash
+                function os_update() {
+                  apt update 
+                  apt upgrade -y
+                }
+
+                function change_hostname() {
+                  hostname=$1
+                  echo $hostname > /etc/hostname
+                  hostname $hostname
+                }
+
+                function add_hostnames_to_hosts_file() {
+                  echo "172.31.0.10 control" >> /etc/hosts
+                  echo "172.31.0.11 worker" >> /etc/hosts
+                  echo "172.31.0.12 worker2" >> /etc/hosts
+                }
+
+                function sudu_no_passwd() {
+                  groupadd admin
+                  sed -i "s/%admin ALL=(ALL) ALL/%admin ALL=(ALL) NOPASSWD: ALL/" /etc/sudoers 
+                }
+
+                function add_user() {
+                  USERNAME=$1
+
+                  echo /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME > /var/log/useradd.txt
+                  /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME 
+                  echo -e "${DefaultPassword}\n${DefaultPassword}" | passwd $USERNAME
+                }
+
+                function use_vim() {
+                  USERNAME=$1
+
+                  echo "export VISUAL=vim" >> /home/$USERNAME/.bashrc
+                }
+
+                function create_ssh_keyfiles() {
+                  mkdir -p /home/kubernetes/.ssh
+                  mv /opt/xforce/id_rsa /home/kubernetes/.ssh/id_rsa
+                  chmod 400 /home/kubernetes/.ssh/id_rsa
+                  mv /opt/xforce/id_rsa.pub /home/kubernetes/.ssh/id_rsa.pub
+                  chmod 400 /home/kubernetes/.ssh/id_rsa.pub
+                  mv /opt/xforce/authorized_keys /home/kubernetes/.ssh/authorized_keys
+                  chmod 400 /home/kubernetes/.ssh/authorized_keys
+
+                  systemctl daemon-reload
+                  systemctl restart ssh
+                }
+
+                function install_kubernetes_worker() {
+                  mkdir -p /opt/kubernetes
+                  cd /opt/kubernetes
+
+                  apt update && apt upgrade -y
+                  apt install openssh-server -y
+                  systemctl enable --now ssh
+                  ufw allow ssh
+                  ufw reload
+                  sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+                  LINE_NO=$(grep -n swap /etc/fstab | awk -F':' '{print $1}')
+                  sed -i "$LINE_NO""d" /etc/fstab 
+                  swapoff -a
+
+                  echo "overlay" > /etc/modules-load.d/k8s.conf
+                  echo "br_netfilter" >> /etc/modules-load.d/k8s.conf
+                  modprobe overlay
+                  modprobe br_netfilter
+
+                  echo "net.bridge.bridge-nf-call-iptables  = 1" > /etc/sysctl.d/k8s.conf
+                  echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/k8s.conf
+                  echo "net.ipv4.ip_forward                 = 1" >> /etc/sysctl.d/k8s.conf
+
+                  sysctl --system
+
+                  mkdir -p /usr/local/lib/systemd/system
+                  cd /tmp
+                  curl -OL https://github.com/containerd/containerd/releases/download/v2.2.2/containerd-2.2.2-linux-amd64.tar.gz
+                  tar Cxzvf /usr/local containerd-2.2.2-linux-amd64.tar.gz
+
+                  curl -OL https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+                  cp containerd.service /usr/local/lib/systemd/system/containerd.service
+
+                  curl -OL https://github.com/opencontainers/runc/releases/download/v1.3.5/runc.amd64
+                  install -m 755 runc.amd64 /usr/local/sbin/runc
+
+                  curl -OL https://github.com/containernetworking/plugins/releases/download/v1.9.1/cni-plugins-linux-amd64-v1.9.1.tgz
+                  mkdir -p /opt/cni/bin
+                  tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.9.1.tgz
+
+                  systemctl daemon-reload
+                  systemctl enable --now containerd
+
+                  mkdir -p /etc/containerd
+                  containerd config default | tee /etc/containerd/config.toml
+
+                  apt-get install -y apt-transport-https ca-certificates curl gpg
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl.sha256"
+
+                  # Link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+                  mkdir -p -m 755 /etc/apt/keyrings
+                  curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+                  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+                  apt update
+                  apt-get install -y kubelet kubeadm kubectl
+                  apt-mark hold kubelet kubeadm kubectl
+
+                  systemctl enable --now kubelet
+                }
+
+                function join_cluster() {
+                  su - kubernetes
+                  cd ~kubernetes
+
+                  while true
+                  do
+                    sudo -u kubernetes scp -o StrictHostKeyChecking=no kubernetes@control:/home/kubernetes/join-cmd.sh .
+
+                    if test -f ./join-cmd.sh
+                    then
+                      sudo bash ./join-cmd.sh
+                      break
+                    else
+                      echo wait for join command...
+                      sleep 10
+                    fi
+                  done
+                }
+
+                function change_permissions() {
+                  chown kubernetes:kubernetes -R /home/kubernetes
+                  chown kubernetes:kubernetes -R /opt
+                }
+
+                function force_password_change() {
+                  passwd -e kubernetes
+                }
+
+                os_update
+                change_hostname worker
+                add_hostnames_to_hosts_file
+                sudu_no_passwd
+
+                for USER in $(echo ${Usernames} | tr "," "\n")
+                do
+                        add_user $USER
+                        use_vim $USER
+                done
+                add_user kubernetes
+                use_vim kubernetes
+                use_vim root
+
+                create_ssh_keyfiles
+                change_permissions
+
+                install_kubernetes_worker
+                change_permissions
+
+                join_cluster
+
+                sleep 300
+                force_password_change
+              mode: 000500
+          commands:
+            01-install-kubernetes-workernode:
+              command: /opt/xforce/01-install-kubernetes-workernode.sh 2>&1 | tee /var/log/01-install-kubernetes-workernode.out
+              ignoreErrors: false
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+    Properties:
+      ImageId: !Ref Ubuntu2404AMI
+      InstanceType: !Ref EC2InstanceType
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1 # Or /dev/sda1 depending on AMI
+          Ebs:
+            VolumeSize: '50' # Size in GB
+            VolumeType: gp3
+            DeleteOnTermination: true
+      IamInstanceProfile: !Ref KubernetesIAMInstanceProfile
+      Tags:
+        - Key: Name
+          Value: KubernetesWorkerNode
+      SecurityGroupIds:
+        - !Ref KubernetesSecurityGroup
+      SubnetId: !Ref PublicSubnetAZa
+      PrivateIpAddress: !Ref PrivateIpWorker
+      UserData: 
+        "Fn::Base64": 
+          !Sub |
+            #!/bin/bash
+            # ===
+            # Source: https://gist.github.com/b0tting/f1a83a8ecca42ae37cc2c40d6174cead - used to install cfn-init and cfn-signal
+            export DEBIAN_FRONTEND=noninteractive
+            export VENV_DIR=/opt/aws/cfn-bootstrap-venv
+            export HELPER_SCRIPTS_BIN_DIR=/opt/aws/bin
+
+            # Install python 3.11 from deadsnakes, this will not be the default python, that will stay on 3.12
+            apt update	
+            apt-get install -y tzdata software-properties-common
+            add-apt-repository -y ppa:deadsnakes/ppa 
+            apt update
+            apt install -y python3.11 python3.11-venv 
+
+            # Set up a virtual env
+            mkdir -p $VENV_DIR	
+            python3.11 -m venv $VENV_DIR	
+            source $VENV_DIR/bin/activate
+
+            # Install the CFN helper scripts. These will link to the virtual environment & 3.11, not touching the 
+            # system standard python 3.12
+            pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+            mkdir -p $HELPER_SCRIPTS_BIN_DIR	
+            ln -s $VENV_DIR/bin/cfn-* $HELPER_SCRIPTS_BIN_DIR
+            deactivate
+            #===
+
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource KubernetesWorkerNode --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource KubernetesWorkerNode --region ${AWS::Region}
+
+  KubernetesWorkerNode2:
+    Type: AWS::EC2::Instance
+    Metadata:
+      'AWS::CloudFormation::Init':
+        config:
+          packages:
+            apt:
+              git: []
+          files:
+            '/opt/xforce/id_rsa': 
+              content: |
+                -----BEGIN OPENSSH PRIVATE KEY-----
+                b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
+                NhAAAAAwEAAQAAAYEAysYlrz6fchTSf/9B/0YZYMY6STraDyInVIaBbSM7nqmjxS2xiIxR
+                8Tu1MqrSDegFj2KoxBey3y3RtyxhpOc1dqCJTKJeukDYCkFzWVwymFTjCttpUBBDD3LU40
+                dYi2P+eAocBDNX4FxAqJeS55LPtxWJCsJD5JR8sC5gtVT2sMoD3z5z+0R41Mgh5zQIfcmq
+                AA9RmtsacspDZUy/Px61d4gRYna8Pq1wvvQnA1Va43MBnVTTk8Oqx4Pa/Ail6alpy+I2Fi
+                yHI5o5eym12gpJd+++mME+pn2V1HT2iVcz96bz7AkhVtMrrWxOnlbg9K+W66c1IRY0XY/F
+                XQv1iP1XqsNQy+Sp6VG5dHyYfMWbplCtn1IQSJhAvNVsMMGDDKo0ynjUFZsmqedyMZNM7f
+                VpPark7KOYGiIPQcOXpokD4U2iXqlL6lJxiIqSQ++u+30agEktxqFMpNk4y7OSkjevlqNM
+                O3yLdnP35d0H5D667FZD3ZW1kuJPijEHkYAMTgbBAAAFiLLgLCSy4CwkAAAAB3NzaC1yc2
+                EAAAGBAMrGJa8+n3IU0n//Qf9GGWDGOkk62g8iJ1SGgW0jO56po8UtsYiMUfE7tTKq0g3o
+                BY9iqMQXst8t0bcsYaTnNXagiUyiXrpA2ApBc1lcMphU4wrbaVAQQw9y1ONHWItj/ngKHA
+                QzV+BcQKiXkueSz7cViQrCQ+SUfLAuYLVU9rDKA98+c/tEeNTIIec0CH3JqgAPUZrbGnLK
+                Q2VMvz8etXeIEWJ2vD6tcL70JwNVWuNzAZ1U05PDqseD2vwIpempacviNhYshyOaOXsptd
+                oKSXfvvpjBPqZ9ldR09olXM/em8+wJIVbTK61sTp5W4PSvluunNSEWNF2PxV0L9Yj9V6rD
+                UMvkqelRuXR8mHzFm6ZQrZ9SEEiYQLzVbDDBgwyqNMp41BWbJqnncjGTTO31aT2q5OyjmB
+                oiD0HDl6aJA+FNol6pS+pScYiKkkPvrvt9GoBJLcahTKTZOMuzkpI3r5ajTDt8i3Zz9+Xd
+                B+Q+uuxWQ92VtZLiT4oxB5GADE4GwQAAAAMBAAEAAAGAKfxxXSH4XeTV2U7/WV4obxNcik
+                E3WZ7Wyfe34ONEuwuhL3jQo9d6OBsG3+Di8aIzVIc3LrNBhFi2bdkwtrZxKYkAJPAR8Trw
+                AN+ghMZEa6pYAK2B1uQnHpHGZvEk8mfYDv744h3HeltfwAjykCSkAeLhp2qmKDRexRQ1Th
+                azpdOOjbEezs5UvqpZ6sepYnJZUv3ZBdmMVmxvHBCSIP240XFJODwhqlC7Ya6oTVZlJWdw
+                1CT2UkhXmkxBEaKwx/sd4AeJRcY7PygpjGvrwfyU3qJVOduHiTrNFH9dUVw7ffN1rZPrrq
+                bU81LQHAUoTRJfiTtga4Ao1dnR6t+2wevxkHofvqVL6R1D/Wx+uP13O442TBs9jHYliYOf
+                neJpQk6vKJ+AQa2hX1oJHhLcmuaPL9jNIIimsX+sxkmcbN96OPhSSvsZSie9PaIET7H1jT
+                luoq61JmI8O4kpKpb8R9bK9W8lkKZIeTI1I2yamYTMUGq3zruZa+IAV333z6kyG3OJAAAA
+                wQCPSQm7IdV2wzSMXVo+DmIu936OfPAdqFsMjg9T744mziXohIY5fWy01hsQfy1iCQVmQC
+                ju+KXmDadDNh9zPNUKxVOk4ehdcNVnHVW4uFHyTuaPiZDC/VnR6ojc8mpllwt2FdX6sGm7
+                JHE6L87nmHS6aZRrMrtnqk0780bqux0ENIynRRE2x6d5zVXSt6H8qwG7jkMO2EICP4bvfy
+                vw766gQ54Yt079Sav6YCf0vj6qllWqy5h0pYWOWXPbHDe+IQUAAADBAP1+HUzRTAHPdmOY
+                MwAfRI/wYwff1fe98Z58LfiPRt0Hhgef9vc/h6f5agc/xV8ll59WipvED+xn0ZK2pT084V
+                63vL7WCyQaHDEXwfx3iffnzWyA/Og/8RnNITbuAvnyB3s9SdIhNwhOpPycw+UPUJM+qnfZ
+                BN53acLKqt+pYEc1UlhBdSdTAQeQUa0xhi+qReUZVVHPqipinAjYuS++Hgv8qRmFLYw+Jw
+                W6PNHVa1HpeUrVu58f/n8dGwaCFwI5lwAAAMEAzMea0XCkfItmTWG9v/2t8+XHeJFk+IFE
+                du9auBERsuwHXAX8jtfTq/T/ZpU76ifGGz+eWuauHqCn5tOal/3SPOIvG6ObSpv+Z960Ns
+                2EjP25ezEuZZhgi+G/uQFIhUUIww1XdNRkuj70+PjmRVId07zW767bonmEN/TpfDUKLqD8
+                UI6e3AgEANwICVzBA/xC0G/NMS4ZmOKonPiGxwsnlzaPNwXL3up//R4dPwUaOswEsDDTIz
+                JotbA3SyvOC11nAAAAEWZyZWRlcmlxdWVAd29ya2VyAQ==
+                -----END OPENSSH PRIVATE KEY-----
+              mode: 000400
+            '/opt/xforce/id_rsa.pub': 
+              content: !Sub |
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDKxiWvPp9yFNJ//0H/RhlgxjpJOtoPIidUhoFtIzueqaPFLbGIjFHxO7UyqtIN6AWPYqjEF7LfLdG3LGGk5zV2oIlMol66QNgKQXNZXDKYVOMK22lQEEMPctTjR1iLY/54ChwEM1fgXECol5Lnks+3FYkKwkPklHywLmC1VPawygPfPnP7RHjUyCHnNAh9yaoAD1Ga2xpyykNlTL8/HrV3iBFidrw+rXC+9CcDVVrjcwGdVNOTw6rHg9r8CKXpqWnL4jYWLIcjmjl7KbXaCkl3776YwT6mfZXUdPaJVzP3pvPsCSFW0yutbE6eVuD0r5brpzUhFjRdj8VdC/WI/Veqw1DL5KnpUbl0fJh8xZumUK2fUhBImEC81WwwwYMMqjTKeNQVmyap53Ixk0zt9Wk9quTso5gaIg9Bw5emiQPhTaJeqUvqUnGIipJD7677fRqASS3GoUyk2TjLs5KSN6+Wo0w7fIt2c/fl3QfkPrrsVkPdlbWS4k+KMQeRgAxOBsE= kubernetes@worker
+              mode: 000400
+            '/opt/xforce/authorized_keys': 
+              content: !Sub |
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD406rW++L6K2Fvrh48++q5Vl0e0/uIGVBHbgNvHK+IKvXX1ix5ozw94XmEaNUtsiJMgRtW7JdEtnWd0Tn/EBHaqZfIfH5fkWUxIEVaZi1Fl7Dn4v1xiaY1oOJfQJ1kyHQNPemTW8xQWy9DLLC959gW9q3/aVNeQt1gt4K2Wr9fFZBNQmeyI/UBhPRtIMWrTyycLdph7UUwYyU0o14V735IihhmJpSnUoDu8IXLX9O9DXJ0MRIi8eRRrO/Raxwhpl8P9k507mtn7PL8GYHWEZAebKDRFy2MNPsEynOjtk+9DBcl1BVPQW4/lzCQaWJIRugcQ9v8R5mieV3ypRXzQspWMN36gOD7xBfDrc8HMKGtThSEFYxVX8TTSRZabwDiU0aUdQrXDOULQhClWfwHttFC82etTF+JecICJ9uWtF2xUyMAYGapz3nK5cXxuKF5Epywmk3zOazciXFsw5nlSju0v1+BPWI+Xkw/X9jiCbhzQEmKGqA4DP0YFQ48RSLOCEM= kubernetes@control
+              mode: 000400
+            '/opt/xforce/01-install-kubernetes-workernode.sh':
+              content: !Sub |
+                #!/bin/bash
+                function os_update() {
+                  apt update 
+                  apt upgrade -y
+                }
+
+                function change_hostname() {
+                  hostname=$1
+                  echo $hostname > /etc/hostname
+                  hostname $hostname
+                }
+
+                function add_hostnames_to_hosts_file() {
+                  echo "172.31.0.10 control" >> /etc/hosts
+                  echo "172.31.0.11 worker" >> /etc/hosts
+                  echo "172.31.0.12 worker2" >> /etc/hosts
+                }
+
+                function sudu_no_passwd() {
+                  groupadd admin
+                  sed -i "s/%admin ALL=(ALL) ALL/%admin ALL=(ALL) NOPASSWD: ALL/" /etc/sudoers 
+                }
+
+                function add_user() {
+                  USERNAME=$1
+
+                  echo /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME > /var/log/useradd.txt
+                  /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME 
+                  echo -e "${DefaultPassword}\n${DefaultPassword}" | passwd $USERNAME
+                }
+
+                function use_vim() {
+                  USERNAME=$1
+
+                  echo "export VISUAL=vim" >> /home/$USERNAME/.bashrc
+                }
+
+                function create_ssh_keyfiles() {
+                  mkdir -p /home/kubernetes/.ssh
+                  mv /opt/xforce/id_rsa /home/kubernetes/.ssh/id_rsa
+                  chmod 400 /home/kubernetes/.ssh/id_rsa
+                  mv /opt/xforce/id_rsa.pub /home/kubernetes/.ssh/id_rsa.pub
+                  chmod 400 /home/kubernetes/.ssh/id_rsa.pub
+                  mv /opt/xforce/authorized_keys /home/kubernetes/.ssh/authorized_keys
+                  chmod 400 /home/kubernetes/.ssh/authorized_keys
+
+                  systemctl daemon-reload
+                  systemctl restart ssh
+                }
+
+                function install_kubernetes_worker() {
+                  mkdir -p /opt/kubernetes
+                  cd /opt/kubernetes
+
+                  apt update && apt upgrade -y
+                  apt install openssh-server -y
+                  systemctl enable --now ssh
+                  ufw allow ssh
+                  ufw reload
+                  sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+                  LINE_NO=$(grep -n swap /etc/fstab | awk -F':' '{print $1}')
+                  sed -i "$LINE_NO""d" /etc/fstab 
+                  swapoff -a
+
+                  echo "overlay" > /etc/modules-load.d/k8s.conf
+                  echo "br_netfilter" >> /etc/modules-load.d/k8s.conf
+                  modprobe overlay
+                  modprobe br_netfilter
+
+                  echo "net.bridge.bridge-nf-call-iptables  = 1" > /etc/sysctl.d/k8s.conf
+                  echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/k8s.conf
+                  echo "net.ipv4.ip_forward                 = 1" >> /etc/sysctl.d/k8s.conf
+
+                  sysctl --system
+
+                  mkdir -p /usr/local/lib/systemd/system
+                  cd /tmp
+                  curl -OL https://github.com/containerd/containerd/releases/download/v2.2.2/containerd-2.2.2-linux-amd64.tar.gz
+                  tar Cxzvf /usr/local containerd-2.2.2-linux-amd64.tar.gz
+
+                  curl -OL https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+                  cp containerd.service /usr/local/lib/systemd/system/containerd.service
+
+                  curl -OL https://github.com/opencontainers/runc/releases/download/v1.3.5/runc.amd64
+                  install -m 755 runc.amd64 /usr/local/sbin/runc
+
+                  curl -OL https://github.com/containernetworking/plugins/releases/download/v1.9.1/cni-plugins-linux-amd64-v1.9.1.tgz
+                  mkdir -p /opt/cni/bin
+                  tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.9.1.tgz
+
+                  systemctl daemon-reload
+                  systemctl enable --now containerd
+
+                  mkdir -p /etc/containerd
+                  containerd config default | tee /etc/containerd/config.toml
+
+                  apt-get install -y apt-transport-https ca-certificates curl gpg
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl.sha256"
+
+                  # Link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+                  mkdir -p -m 755 /etc/apt/keyrings
+                  curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+                  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+                  apt update
+                  apt-get install -y kubelet kubeadm kubectl
+                  apt-mark hold kubelet kubeadm kubectl
+
+                  systemctl enable --now kubelet
+                }
+
+                function join_cluster() {
+                  su - kubernetes
+                  cd ~kubernetes
+
+                  while true
+                  do
+                    sudo -u kubernetes scp -o StrictHostKeyChecking=no kubernetes@control:/home/kubernetes/join-cmd.sh .
+
+                    if test -f ./join-cmd.sh
+                    then
+                      sudo bash ./join-cmd.sh
+                      break
+                    else
+                      echo wait for join command...
+                      sleep 10
+                    fi
+                  done
+                }
+
+                function change_permissions() {
+                  chown kubernetes:kubernetes -R /home/kubernetes
+                  chown kubernetes:kubernetes -R /opt
+                }
+
+                function force_password_change() {
+                  passwd -e kubernetes
+                }
+
+                os_update
+                change_hostname worker2
+                add_hostnames_to_hosts_file
+                sudu_no_passwd
+
+                for USER in $(echo ${Usernames} | tr "," "\n")
+                do
+                        add_user $USER
+                        use_vim $USER
+                done
+                add_user kubernetes
+                use_vim kubernetes
+                use_vim root
+
+                create_ssh_keyfiles
+                change_permissions
+
+                install_kubernetes_worker
+                change_permissions
+
+                join_cluster
+
+                sleep 300
+                force_password_change
+              mode: 000500
+          commands:
+            01-install-kubernetes-workernode:
+              command: /opt/xforce/01-install-kubernetes-workernode.sh 2>&1 | tee /var/log/01-install-kubernetes-workernode.out
+              ignoreErrors: false
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT30M
+    Properties:
+      ImageId: !Ref Ubuntu2404AMI
+      InstanceType: !Ref EC2InstanceType
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1 # Or /dev/sda1 depending on AMI
+          Ebs:
+            VolumeSize: '50' # Size in GB
+            VolumeType: gp3
+            DeleteOnTermination: true
+      IamInstanceProfile: !Ref KubernetesIAMInstanceProfile
+      Tags:
+        - Key: Name
+          Value: KubernetesWorkerNode2
+      SecurityGroupIds:
+        - !Ref KubernetesSecurityGroup
+      SubnetId: !Ref PublicSubnetAZa
+      PrivateIpAddress: !Ref PrivateIpWorker2
+      UserData: 
+        "Fn::Base64": 
+          !Sub |
+            #!/bin/bash
+            # ===
+            # Source: https://gist.github.com/b0tting/f1a83a8ecca42ae37cc2c40d6174cead - used to install cfn-init and cfn-signal
+            export DEBIAN_FRONTEND=noninteractive
+            export VENV_DIR=/opt/aws/cfn-bootstrap-venv
+            export HELPER_SCRIPTS_BIN_DIR=/opt/aws/bin
+
+            # Install python 3.11 from deadsnakes, this will not be the default python, that will stay on 3.12
+            apt update	
+            apt-get install -y tzdata software-properties-common
+            add-apt-repository -y ppa:deadsnakes/ppa 
+            apt update
+            apt install -y python3.11 python3.11-venv 
+
+            # Set up a virtual env
+            mkdir -p $VENV_DIR	
+            python3.11 -m venv $VENV_DIR	
+            source $VENV_DIR/bin/activate
+
+            # Install the CFN helper scripts. These will link to the virtual environment & 3.11, not touching the 
+            # system standard python 3.12
+            pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+            mkdir -p $HELPER_SCRIPTS_BIN_DIR	
+            ln -s $VENV_DIR/bin/cfn-* $HELPER_SCRIPTS_BIN_DIR
+            deactivate
+            #===
+
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource KubernetesWorkerNode2 --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource KubernetesWorkerNode2 --region ${AWS::Region}
+
+  # DeleteVpc
+  # =========
+  # When the VPC is deleted, there might be extra security groups that have been added because someone tried f.e. to start a VM in that VPC. The deletion of the VPC
+  # will wait until these SGs have been removed. This is not friendly for the users of the templates, so delete the SGs by this custom resource.  
+
+  DeleteVpcExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+              - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: "DeleteVpcExecutionRolePolicies"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CloudWatch
+                Effect: "Allow"
+                Action: 
+                  - "logs:PutLogEvents"
+                  - "logs:CreateLogStream"
+                  - "logs:CreateLogGroup"
+                Resource: "*"
+              - Sid: EC2
+                Effect: "Allow"
+                Action: 
+                  - "ec2:DescribeSecurityGroups"  
+                  - "ec2:DeleteSecurityGroup"
+                Resource: "*"
+      Path: /
+  DeleteVpcFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt DeleteVpcExecutionRole.Arn
+      Timeout: 60
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python
+          # -*- coding: utf-8 -*-
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-lambda-function-code-cfnresponsemodule.html
+
+          import json
+          import cfnresponse
+          import boto3
+
+          # get_security_groups
+          # ===================
+          def get_security_groups(vpc):
+            ec2 = boto3.client('ec2')
+            response = ec2.describe_security_groups(
+                Filters=[
+                    {
+                        'Name': 'vpc-id',
+                        'Values': [vpc]
+                    },
+                ]
+            )
+            return response["SecurityGroups"]
+
+          # delete_security_group
+          # =====================
+          def delete_security_group(security_group_name, security_group_id):
+            print("TRACE Delete security group " + security_group_name)
+
+            ec2 = boto3.client('ec2')
+            response = ec2.delete_security_group(
+              GroupId=security_group_id
+            )
+            print(response)
+
+          # Main
+          # ====
+
+          def lambda_handler(event, context):
+            try:
+                vpc = event['ResourceProperties']['Vpc']
+                print(event)
+
+                if event['RequestType'] == 'Delete':
+                    print ("TRACE Get security groups")
+                    security_groups = get_security_groups(vpc)
+                    print(security_groups)
+
+                    for security_group in security_groups:
+
+                      security_group_is_part_of_stack = False
+                      if ("Tags" in security_group):
+                        for tag in security_group["Tags"]:
+
+                          if (tag["Key"] == "aws:cloudformation:stack-name"):
+                            security_group_is_part_of_stack = True
+
+                      security_group_name = security_group["GroupName"]
+                      security_group_id   = security_group["GroupId"]
+
+                      if ((not security_group_is_part_of_stack) and 
+                          (security_group_name != "default")):
+
+                        delete_security_group(security_group_name, security_group_id)
+
+                print("TRACE Before SUCCESS")
+                responseData = {}
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "n/a")
+            except Exception as e:
+                print(e)
+                print("TRACE Before FAILED")
+                responseData = {}
+                cfnresponse.send(event, context, cfnresponse.FAILED, responseData, "n/a")
+
+            return
+      Runtime: python3.13
+
+  NginxRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      EmptyOnDelete: True
+      RepositoryName: nginx
+
+Outputs:
+  ControlNodeId:
+    Value: !Ref KubernetesControlNode
+  WorkerNodeId:
+    Value: !Ref KubernetesWorkerNode
+
