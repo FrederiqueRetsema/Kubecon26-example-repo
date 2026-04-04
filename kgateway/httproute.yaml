@@ -1,0 +1,23 @@
+# Testing:
+# See: https://kgateway.dev/docs/envoy/latest/install/sample-app/
+# 1) kubectl port-forward deployment/http -n kgateway-system 8080:8080
+# 2) curl localhost:8080 -H "host: www.example2.com:8080"
+#
+# Connect to AWS: see
+# https://kgateway.dev/docs/envoy/main/integrations/aws-elb/nlb/
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: nginx
+  namespace: dev
+spec:
+  parentRefs:
+    - name: http
+      namespace: kgateway-system
+  hostnames:
+    - "www.example2.com"
+  rules:
+    - backendRefs:
+        - name: my-service
+          port: 1234
