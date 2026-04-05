@@ -41,7 +41,7 @@ function add_user() {
 
   echo /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME > /var/log/useradd.txt
   /usr/sbin/useradd -d /home/$USERNAME -G admin -m -s /bin/bash $USERNAME 
-  echo -e "${DefaultPassword}\n${DefaultPassword}" | passwd $USERNAME
+  echo -e "##DefaultPassword##\n##DefaultPassword##" | passwd $USERNAME
 }
 
 function use_vim() {
