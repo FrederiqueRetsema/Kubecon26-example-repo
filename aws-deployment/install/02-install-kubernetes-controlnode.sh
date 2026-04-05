@@ -262,7 +262,7 @@ EOF
         -n external-secrets \
         --create-namespace
 
-  argocd_wait_for_healty eso
+  sleep 10
 
   argocd app create vault-secret-store \
   --project default \
