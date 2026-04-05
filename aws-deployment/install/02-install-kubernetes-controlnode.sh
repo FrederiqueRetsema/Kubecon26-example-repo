@@ -266,8 +266,8 @@ EOF
 
   argocd app create vault-secret-store \
   --project default \
-  --repo https://github.com/FrederiqueRetsema/external-secrets-gitops-example.git \
-  --path "./manifests/vault-integration" \
+  --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
+  --path "./examples/refesh-secrets/manifests/vault-integration" \
   --sync-policy auto \
   --dest-namespace external-secrets \
   --dest-server https://kubernetes.default.svc
@@ -280,8 +280,8 @@ EOF
   
   argocd app create my-secret-app \
   --project default \
-  --repo https://github.com/FrederiqueRetsema/external-secrets-gitops-example.git \
-  --path "./manifests/app" \
+  --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
+  --path "./examples/refesh-secrets/manifests/app" \
   --sync-policy auto \
   --dest-namespace default \
   --dest-server https://kubernetes.default.svc                  
