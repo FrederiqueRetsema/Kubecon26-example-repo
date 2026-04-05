@@ -255,15 +255,12 @@ EOF
 
   sleep 10
 
-  argocd app create eso \
-  --project default \
-  --repo https://charts.external-secrets.io \
-  --helm-chart external-secrets \
-  --revision 2.2.0 \
-  --sync-policy auto \
-  --sync-option CreateNamespace=true \
-  --dest-namespace external-secrets \
-  --dest-server https://kubernetes.default.svc
+  helm repo add external-secrets https://charts.external-secrets.io
+
+  helm install external-secrets \
+       external-secrets/external-secrets \
+        -n external-secrets \
+        --create-namespace
 
   argocd_wait_for_healty eso
 
