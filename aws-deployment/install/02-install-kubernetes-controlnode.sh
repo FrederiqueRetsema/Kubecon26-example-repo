@@ -226,26 +226,19 @@ function install_external_secrets_gitops_example() {
 
   kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
 vault login root
-EOF
-  sleep 2
-  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
 
 # Write the demo credentials
 vault kv put secret/mysql_credentials \
   url="mysql.example.com:3306" \
   username="my_demo_user" \
   password="my_demo_password"
-EOF
-  sleep 2
-  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
 
 # Enable Kubernetes auth
 vault auth enable kubernetes
 vault write auth/kubernetes/config \
-  kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT"
-EOF
-
-  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
+  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
 # Policy and role for ESO
 vault policy write eso-read-policy - <<EOF2
@@ -253,9 +246,6 @@ path "secret/*" {
   capabilities = [ "read", "list" ]
 }
 EOF2
-EOF
-  sleep 2
-  kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
 vault write auth/kubernetes/role/demo \
   bound_service_account_names=* \
   bound_service_account_namespaces=* \
