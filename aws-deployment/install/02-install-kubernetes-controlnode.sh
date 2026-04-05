@@ -224,8 +224,8 @@ sleep 30
 install_cilium
 install_kgateway
 install_argocd
-echo "Wait for 60 seconds..."
-sleep 60
+echo "$(date +%H:%M:%S) Wait for 3 minutes..."
+sleep 180
 install_examples
 
 echo $(date +%H:%M:%S) wait 3 minutes
