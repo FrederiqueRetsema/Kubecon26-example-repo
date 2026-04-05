@@ -176,6 +176,7 @@ function install_argocd() {
   curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
   install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
   rm argocd-linux-amd64
+  allow_external_access argocd argocd-server 30007
 }
 
 function install_examples{} (
@@ -227,7 +228,4 @@ install_examples
 
 echo $(date +%H:%M:%S) wait 3 minutes
 sleep 180
-allow_external_access argocd argocd-server 30007
-allow_external_access vault vault 30008
-allow_external_access default gitops-secrets-service 30001
 force_password_change

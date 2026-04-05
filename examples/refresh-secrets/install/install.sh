@@ -22,6 +22,15 @@ function argocd_wait_for_healty() {
   done
 }
 
+function allow_external_access() {
+  NAMESPACE=$1
+  SERVICE=$2
+  EXTERNAL_PORT=$3
+
+  kubectl patch svc "$SERVICE" -n "$NAMESPACE" -p '{"spec": {"type": "NodePort"}}'
+  kubectl patch svc "$SERVICE" -n "$NAMESPACE" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/0/nodePort\", \"value\":$EXTERNAL_PORT}]"
+}
+
 ARGOCD_PWD=$(argocd admin initial-password -n argocd | head -n 1)
 ARGOCD_IP=$(kubectl get svc -n argocd argocd-server | tail -n 1 | awk '{print $3}')
 echo "Pwd admin = $ARGOCD_PWD"
@@ -99,5 +108,8 @@ argocd app create my-secret-app \
 --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
 --path "./examples/refresh-secrets/manifests/app" \
 --sync-policy auto \
---dest-namespace default \
+--dest-namespace example-refresh-secrets \
 --dest-server https://kubernetes.default.svc                  
+
+allow_external_access vault vault 30008
+allow_external_access default gitops-secrets-service 30001
