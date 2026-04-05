@@ -1,157 +1,37 @@
-# ArgoCD with Vault and the External secret operator demo
+# Refresh secrets
 
-(Original source: https://github.com/kostis-codefresh/external-secrets-gitops-example, changed to make it work for Infrastructure as Code. Also added Python source).
+Talk name: "GitOps and Secrets: State of the Union - Kostis Kapelonis, Octopus Deploy"
+Repo: https://github.com/kostis-codefresh/external-secrets-gitops-example
 
-## 1. Prerequisites
+Idea is that you should not store secrets in ArgoCD. Store them somewhere outside
+Kubernetes, using the external-secrets-operator.
 
-- A Kubernetes cluster with `cluster-admin` permissions
-- `kubectl` and [Argo CD installed](https://argo-cd.readthedocs.io/en/stable/getting_started/) in the `argocd` namespace
+The deployment is not very stable. Sometimes it works, sometimes it doesn't. Upgrading
+to the newest versions of external-secrets-operator (via helm, not via argocd) and vault
+worked partly.
 
-```shell
-kubectl create namespace argocd
-kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent
-.com/argoproj/argo-cd/stable/manifests/install.yaml
-kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
-kubectl get all -n argocd
-argocd admin initial-password -n argocd
-argocd login localhost:80
+After installation, you might see errors in the logs of the pods in the 
+external-secrets deployment:
+
+```
+kubernetes@control:~$ kubectl get pods -n external-secrets
+NAME                                               READY   STATUS    RESTARTS   AGE
+external-secrets-79fbd8ddfc-7rzhm                  1/1     Running   0          5m25s
+external-secrets-cert-controller-b6d69f9b5-kqqnb   1/1     Running   0          14m
+external-secrets-webhook-5d7f66549-d2zvk           1/1     Running   0          14m
+
+kubernetes@control:~$ kubectl logs -n external-secrets external-secrets-79fbd8ddfc-7rzhm
+
+<<errors about 404's, permission denies, etc>>
 ```
 
----
+Solution:
 
-## 2. Set up Vault
-
-Install Vault in dev mode (root token = `root`, pre-unsealed) via Argo CD:
-
-```bash
-argocd app create vault \
---project default \
---repo https://helm.releases.hashicorp.com \
---helm-chart vault \
---revision 0.28.0 \
---sync-policy auto \
---sync-option CreateNamespace=true \
---parameter server.dev.enabled=true \
---dest-namespace vault \
---dest-server https://kubernetes.default.svc
 ```
-
-Exec into the pod and configure it:
-
-```bash
-kubectl exec -it vault-0 -n vault -- /bin/sh
-```
-
-```sh
-vault login root
-
-# Write the demo credentials
-vault kv put secret/mysql_credentials \
-  url="mysql.example.com:3306" \
-  username="my_demo_user" \
-  password="my_demo_password"
-
-# Enable Kubernetes auth
-vault auth enable kubernetes
+kubernetes@control:~$ kubectl exec -it vault-0 -n vault -- sh
 vault write auth/kubernetes/config \
-  kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT"
-
-# Policy and role for ESO
-vault policy write eso-read-policy - <<EOF
-path "secret/*" {
-  capabilities = [ "read", "list" ]
-}
-EOF
-
-vault write auth/kubernetes/role/demo \
-  bound_service_account_names=* \
-  bound_service_account_namespaces=* \
-  policies=eso-read-policy \
-  ttl=24h
-
+    kubernetes_host=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT
 exit
+
+kubernetes@control:~$ kubectl delete pod -n external-secrets external-secrets-79fbd8ddfc-7rzhm
 ```
-
----
-
-## 3. Set up the External Secrets Operator
-
-```bash
-argocd app create eso \
---project default \
---repo https://charts.external-secrets.io \
---helm-chart external-secrets \
---revision 0.9.19 \
---sync-policy auto \
---sync-option CreateNamespace=true \
---dest-namespace external-secrets \
---dest-server https://kubernetes.default.svc
-```
-
-Apply the `ClusterSecretStore` (connects ESO to Vault using the `demo` Kubernetes auth role):
-
-```bash
-argocd app create vault-secret-store \
---project default \
---repo https://github.com/kostis-codefresh/external-secrets-gitops-example.git \
---path "./manifests/vault-integration" \
---sync-policy auto \
---dest-namespace external-secrets \
---dest-server https://kubernetes.default.svc
-
-
-kubectl get clustersecretstore vault-backend  # should show READY: True
-```
-
----
-
-## 4. Deploy the app with Argo CD
-
-Point an Argo CD application at `manifests/app` in this repo. That directory contains the Deployment, Service, and the `ExternalSecret` that creates the `mysql-credentials` Kubernetes secret.
-
-```bash
-argocd app create my-secret-app \
---project default \
---repo https://github.com/kostis-codefresh/external-secrets-gitops-example.git \
---path "./manifests/app" \
---sync-policy auto \
---dest-namespace default \
---dest-server https://kubernetes.default.svc
-```
-
-Once synced, verify and access the app:
-
-```bash
-kubectl get externalsecret my-db-credentials  # STATUS: SecretSynced
-kubectl port-forward svc/gitops-secrets-service 8080:8080
-```
-
-Open http://localhost:8080 to see the current credentials.
-
----
-
-## 5. Rotate a secret and watch the app update itself
-
-Update the secret in Vault:
-
-```bash
-kubectl exec -it vault-0 -n vault -- vault kv put secret/mysql_credentials \
-  url="mysql.example.com:3306" \
-  username="rotated_user" \
-  password="new_super_secret_password"
-```
-
-You can also use the Vault UI but at `http://localhost:8200/ui/vault/secrets/secret/kv/mysql_credentials/metadata/versions`. 
-Port forward with `kubectl port-forward -n vault vault-0 8200:8200`
-Then login using `root` as token.
-
-Within ~15 seconds the app reloads automatically—no restart, no Argo CD sync:
-
-```bash
-kubectl logs -f -l app=gitops-secrets-app
-# Config file changed: /secrets/credentials
-# Username is rotated_user
-# Password is new_super_secret_password
-```
-
-Refresh `http://localhost:8080` to confirm.
