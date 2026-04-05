@@ -92,7 +92,7 @@ sleep 10
 argocd app create vault-secret-store \
 --project default \
 --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
---path "./examples/refresh-secrets/manifests/vault-integration" \
+--path "./examples/02-refresh-secrets/manifests/vault-integration" \
 --sync-policy auto \
 --dest-namespace external-secrets \
 --dest-server https://kubernetes.default.svc
@@ -106,7 +106,7 @@ kubectl get clustersecretstore vault-backend
 argocd app create my-secret-app \
 --project default \
 --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
---path "./examples/refresh-secrets/manifests/app" \
+--path "./examples/02-refresh-secrets/manifests/app" \
 --sync-policy auto \
 --sync-option CreateNamespace=true \
 --dest-namespace example-refresh-secrets \
