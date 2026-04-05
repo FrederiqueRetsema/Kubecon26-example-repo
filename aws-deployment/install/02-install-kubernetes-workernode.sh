@@ -135,6 +135,7 @@ function join_cluster() {
 function change_permissions() {
   chown kubernetes:kubernetes -R /home/kubernetes
   chown kubernetes:kubernetes -R /opt
+  chown kubernetes:kubernetes -R /clone
 }
 
 function force_password_change() {

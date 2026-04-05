@@ -145,6 +145,7 @@ function make_it_possible_to_use_kubectl() {
 function change_permissions() {
   chown kubernetes:kubernetes -R /home/kubernetes
   chown kubernetes:kubernetes -R /opt
+  chown kubernetes:kubernetes -R /clone
 }
 
 function install_cilium() {
@@ -163,6 +164,9 @@ function install_kgateway() {
   helm install kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds --version v2.2.2 --namespace kgateway-system --create-namespace
   helm install kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --version v2.2.2 --namespace kgateway-system --create-namespace
   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+  kubectl create namespace example-kgateway
+  cd /clone/Kubecon26-example-repo/examples/kgateway
+  ls -1 | grep -v *.md | awk '{print "kubectl apply -f "$1}'| bash 
 }
 
 function install_argocd() {                  
