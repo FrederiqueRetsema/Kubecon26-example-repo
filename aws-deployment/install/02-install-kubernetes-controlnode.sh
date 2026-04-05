@@ -215,7 +215,7 @@ function install_external_secrets_gitops_example() {
   --project default \
   --repo https://helm.releases.hashicorp.com \
   --helm-chart vault \
-  --revision 0.28.0 \
+  --revision 0.32.0 \
   --sync-policy auto \
   --sync-option CreateNamespace=true \
   --parameter server.dev.enabled=true \
@@ -236,9 +236,7 @@ vault kv put secret/mysql_credentials \
 # Enable Kubernetes auth
 vault auth enable kubernetes
 vault write auth/kubernetes/config \
-  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-  kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
-  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    kubernetes_host=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT
 
 # Policy and role for ESO
 vault policy write eso-read-policy - <<EOF2
@@ -261,7 +259,7 @@ EOF
   --project default \
   --repo https://charts.external-secrets.io \
   --helm-chart external-secrets \
-  --revision 0.9.19 \
+  --revision 2.2.0 \
   --sync-policy auto \
   --sync-option CreateNamespace=true \
   --dest-namespace external-secrets \
