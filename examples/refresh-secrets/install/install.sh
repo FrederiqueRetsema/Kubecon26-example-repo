@@ -101,15 +101,16 @@ argocd_wait_for_healty vault-secret-store
 sleep 5
 
 echo "Should show READY: True"
-kubectl get clustersecretstore vault-backend  # should show READY: True
+kubectl get clustersecretstore vault-backend 
 
 argocd app create my-secret-app \
 --project default \
 --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
 --path "./examples/refresh-secrets/manifests/app" \
 --sync-policy auto \
+--sync-option CreateNamespace=true \
 --dest-namespace example-refresh-secrets \
 --dest-server https://kubernetes.default.svc                  
 
 allow_external_access vault vault 30008
-allow_external_access default gitops-secrets-service 30001
+allow_external_access example-refresh-secrets gitops-secrets-service 30001

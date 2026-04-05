@@ -179,14 +179,14 @@ function install_argocd() {
   allow_external_access argocd argocd-server 30007
 }
 
-function install_examples{} (
+function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls)
   for EXAMPLE in $EXAMPLES
   do
       bash $EXAMPLE/install/install.sh
   done  
-)
+}
 
 function allow_external_access() {
   NAMESPACE=$1
