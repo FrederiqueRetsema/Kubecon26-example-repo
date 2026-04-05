@@ -25,7 +25,10 @@ kubernetes@control:~$ kubectl logs -n external-secrets external-secrets-79fbd8dd
 <<errors about 404's, permission denies, etc>>
 ```
 
-Solution:
+## Workaround:
+
+When you configure the authentication again and then stop the external-secrets pod,
+then in general the connection is made.
 
 ```
 kubernetes@control:~$ kubectl exec -it vault-0 -n vault -- sh
