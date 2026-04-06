@@ -15,7 +15,7 @@ function get_secret_access_key_from_secret() {
   SECRET_ID=$1
 
   SECRET_ACCESS_KEY=$(aws secretsmanager get-secret-value \
-                                    --secret-id $SECRET_IDvvi \
+                                    --secret-id $SECRET_ID \
                                     --region ##AWS-Region## \
                                     --query SecretString \
                                     --output text | jq -r '.secret_access_key')
@@ -92,7 +92,7 @@ argocd_wait_for_healty ssm-parameters-secret-store
 sleep 5
 
 echo "Should show READY: True"
-kubectl get clustersecretstore vault-backend 
+kubectl get clustersecretstore 
 
 argocd app create my-secret-app-secretsmanager \
 --project default \
