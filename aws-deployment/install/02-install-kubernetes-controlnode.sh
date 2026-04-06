@@ -179,6 +179,15 @@ function install_argocd() {
   allow_external_access argocd argocd-server 30007
 }
 
+function install_external_secrets_operator() {
+  helm repo add external-secrets https://charts.external-secrets.io
+
+  helm install external-secrets \
+      external-secrets/external-secrets \
+      -n external-secrets \
+      --create-namespace
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls)
