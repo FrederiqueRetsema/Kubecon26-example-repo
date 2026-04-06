@@ -116,7 +116,9 @@ Resources:
                 Action:
                   - "secretsmanager:GetSecretValue"
                   - "secretsmanager:DescribeSecret"
-                Resource: !Ref ExternalSecretsOperatorCredentials
+                Resource:
+                  - !Ref ExternalSecretsOperatorSSMCredentials
+                  - !Ref ExternalSecretsOperatorSecretsCredentials
 
   KubernetesIAMInstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
@@ -164,6 +166,7 @@ Resources:
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
+                find . -type f -exec sed -i 's/##AWSRegion##/'${AWS::Region}'/g' {} \;
 
           commands:
             01-initialize-files:
@@ -615,27 +618,62 @@ Resources:
             Resource:
               - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/kubecon26/examples/03-refresh-secrets-aws/*"
 
-  ExternalSecretsOperatorUser:
+  ExternalSecretsOperatorSSMUser:
     Type: "AWS::IAM::User"
     Properties:
-      UserName: kubecon26-external-secrets-operator
+      UserName: kubecon26-external-secrets-operator-ssm-parameters
       ManagedPolicyArns:
         - !Ref SSMParameterReadWritePolicy
 
-  ExternalSecretsOperatorAccessKey:
+  ExternalSecretsOperatorSSMAccessKey:
     Type: "AWS::IAM::AccessKey"
     Properties:
-      UserName: !Ref ExternalSecretsOperatorUser
+      UserName: !Ref ExternalSecretsOperatorSSMUser
 
-  ExternalSecretsOperatorCredentials:
+  ExternalSecretsOperatorSSMCredentials:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: kubecon26-external-secrets-operator-credentials
+      Name: kubecon26-external-secrets-operator-ssm-credentials
       SecretString: !Sub
-        - '{"access_key":"${AccessKey}",
-            "secret_access_key":"${SecretKey}"}'
-        - AccessKey: !Ref ExternalSecretsOperatorAccessKey
-          SecretKey: !GetAtt ExternalSecretsOperatorAccessKey.SecretAccessKey
+        - '{"access_key":"${AccessKey}","secret_access_key":"${SecretKey}"}'
+        - AccessKey: !Ref ExternalSecretsOperatorSSMAccessKey
+          SecretKey: !GetAtt ExternalSecretsOperatorSSMAccessKey.SecretAccessKey
+
+  SecretsManagerReadWritePolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowReadAndWriteOnMysqlCredentialsSecret
+            Effect: "Allow"
+            Action:
+              - "secretsmanager:GetSecretValue"
+              - "secretsmanager:DescribeSecret"
+              - "secretsmanager:PutSecretValue"
+              - "secretsmanager:UpdateSecret"
+            Resource: !Ref MysqlCredentials
+
+  ExternalSecretsOperatorSecretsUser:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: kubecon26-external-secrets-operator-secrets-manager
+      ManagedPolicyArns:
+        - !Ref SecretsManagerReadWritePolicy
+
+  ExternalSecretsOperatorSecretsAccessKey:
+    Type: "AWS::IAM::AccessKey"
+    Properties:
+      UserName: !Ref ExternalSecretsOperatorSecretsUser
+
+  ExternalSecretsOperatorSecretsCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: kubecon26-external-secrets-operator-secrets-credentials
+      SecretString: !Sub
+        - '{"access_key":"${AccessKey}","secret_access_key":"${SecretKey}"}'
+        - AccessKey: !Ref ExternalSecretsOperatorSecretsAccessKey
+          SecretKey: !GetAtt ExternalSecretsOperatorSecretsAccessKey.SecretAccessKey
 
   MysqlCredentials:
     Type: AWS::SecretsManager::Secret

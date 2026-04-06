@@ -11,7 +11,7 @@ fi
 echo "Stackname=${STACKNAME}"
 echo "Deploy started at $(date +%H:%M:%S), it will take about 15 minutes to finish"
 
-aws cloudformation deploy --stack-name "${STACKNAME}" --template-file "./cloudformation.yaml" --parameter-overrides ConsultantName="${CONSULTANT_NAME}" --capabilities "CAPABILITY_IAM" --s3-bucket "${BUCKET_NAME}" --profile "${PROFILE}"
+aws cloudformation deploy --stack-name "${STACKNAME}" --template-file "./cloudformation.yaml" --parameter-overrides ConsultantName="${CONSULTANT_NAME}" --capabilities "CAPABILITY_NAMED_IAM" --s3-bucket "${BUCKET_NAME}" --profile "${PROFILE}"
 
 IDS="$(aws cloudformation describe-stacks --stack-name ${STACKNAME} --profile "${PROFILE}")"
 ID_CONTROL="$(echo ${IDS} | jq '.Stacks[0].Outputs[] | select(.OutputKey=="ControlNodeId") | .OutputValue' | awk -F'"' '{print $2}')"
