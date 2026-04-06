@@ -684,12 +684,6 @@ Resources:
          "userid"  : "my_second_user",
          "password": "my_second_demo_password"}
 
-  NginxRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      EmptyOnDelete: True
-      RepositoryName: nginx
-
 Outputs:
   ControlNodeId:
     Value: !Ref KubernetesControlNode

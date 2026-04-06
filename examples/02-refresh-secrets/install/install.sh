@@ -100,7 +100,7 @@ argocd app create my-secret-app \
 --path "./examples/02-refresh-secrets/manifests/app" \
 --sync-policy auto \
 --sync-option CreateNamespace=true \
---dest-namespace example-refresh-secrets \
+--dest-namespace 02-example-refresh-secrets \
 --dest-server https://kubernetes.default.svc                  
 
 allow_external_access vault vault 30008
