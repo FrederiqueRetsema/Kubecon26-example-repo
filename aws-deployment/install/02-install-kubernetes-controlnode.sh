@@ -15,6 +15,15 @@ function install_k9s() {
   cp ~/.local/bin/k9s /usr/local/bin
 }
 
+function install_aws_cli() {
+  export HOME="/root"
+
+  cd /tmp
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  unzip awscliv2.zip
+  ./aws/install
+}
+
 function install_helm() {
   curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
   chmod 700 get_helm.sh
@@ -233,6 +242,7 @@ sleep 30
 install_cilium
 install_kgateway
 install_argocd
+install_external_secrets_operator
 echo "$(date +%H:%M:%S) Wait for 3 minutes..."
 sleep 180
 install_examples

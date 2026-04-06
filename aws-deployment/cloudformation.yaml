@@ -107,6 +107,16 @@ Resources:
       ManagedPolicyArns:
         - !FindInMap [ "AWSManagedRoles", "SSM", "AmazonSSMManagedInstanceCore"]
         - !FindInMap [ "AWSManagedRoles", "ECR", "EC2InstanceProfileForImageBuilderECRContainerBuilds"]
+      Policies:
+        - PolicyName: "ReadExternalSecretsOperatorCredentials"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                  - "secretsmanager:DescribeSecret"
+                Resource: !Ref ExternalSecretsOperatorCredentials
 
   KubernetesIAMInstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
@@ -223,6 +233,7 @@ Resources:
           packages:
             apt:
               git: []
+              unzip: []
           files:
             '/opt/xforce/01-initialize-files.sh':
               content: !Sub |
@@ -491,6 +502,149 @@ Resources:
 
             return
       Runtime: python3.13
+
+  SSMParameterUrl:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /kubecon26/examples/03-refresh-secrets-aws/url
+      Type: String
+      Value: "mysql3.example.com:3306"
+
+  SSMParameterUserid:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /kubecon26/examples/03-refresh-secrets-aws/userid
+      Type: String
+      Value: my_third_user
+
+  SSMSecureStringExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+              - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: "SSMSecureStringPolicies"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CloudWatch
+                Effect: "Allow"
+                Action:
+                  - "logs:PutLogEvents"
+                  - "logs:CreateLogStream"
+                  - "logs:CreateLogGroup"
+                Resource: "*"
+              - Sid: SSM
+                Effect: "Allow"
+                Action:
+                  - "ssm:PutParameter"
+                  - "ssm:DeleteParameter"
+                Resource: "*"
+      Path: /
+
+  SSMSecureStringFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt SSMSecureStringExecutionRole.Arn
+      Timeout: 60
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python
+          # -*- coding: utf-8 -*-
+
+          import cfnresponse
+          import boto3
+
+          def lambda_handler(event, context):
+            try:
+                ssm = boto3.client('ssm')
+                name  = event['ResourceProperties']['Name']
+                value = event['ResourceProperties']['Value']
+
+                if event['RequestType'] in ['Create', 'Update']:
+                    ssm.put_parameter(
+                        Name=name,
+                        Value=value,
+                        Type='SecureString',
+                        Overwrite=True
+                    )
+
+                if event['RequestType'] == 'Delete':
+                    try:
+                        ssm.delete_parameter(Name=name)
+                    except ssm.exceptions.ParameterNotFound:
+                        pass
+
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, name)
+            except Exception as e:
+                print(e)
+                cfnresponse.send(event, context, cfnresponse.FAILED, {}, "n/a")
+      Runtime: python3.13
+
+  SSMParameterPassword:
+    Type: Custom::SSMSecureString
+    Properties:
+      ServiceToken: !GetAtt SSMSecureStringFunction.Arn
+      Name: /kubecon26/examples/03-refresh-secrets-aws/password
+      Value: my_third_demo_password
+
+  SSMParameterReadWritePolicy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowReadAndWriteOnSSMParametersInKubecon26Parameters
+            Effect: "Allow"
+            Action:
+              - "ssm:DeleteParameter"
+              - "ssm:DeleteParameters"
+              - "ssm:DescribeParameters"
+              - "ssm:GetParameter"
+              - "ssm:GetParameters"
+              - "ssm:GetParametersByPath"
+              - "ssm:PutParameter"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/kubecon26/examples/03-refresh-secrets-aws/*"
+
+  ExternalSecretsOperatorUser:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: kubecon26-external-secrets-operator
+      ManagedPolicyArns:
+        - !Ref SSMParameterReadWritePolicy
+
+  ExternalSecretsOperatorAccessKey:
+    Type: "AWS::IAM::AccessKey"
+    Properties:
+      UserName: !Ref ExternalSecretsOperatorUser
+
+  ExternalSecretsOperatorCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: kubecon26-external-secrets-operator-credentials
+      SecretString: !Sub
+        - '{"access_key":"${AccessKey}",
+            "secret_access_key":"${SecretKey}"}'
+        - AccessKey: !Ref ExternalSecretsOperatorAccessKey
+          SecretKey: !GetAtt ExternalSecretsOperatorAccessKey.SecretAccessKey
+
+  MysqlCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: mysql_credentials
+      SecretString: |
+        {"url"     : "mysql2.example.com:3306",
+         "userid"  : "my_second_user",
+         "password": "my_second_demo_password"}
 
   NginxRepository:
     Type: AWS::ECR::Repository
