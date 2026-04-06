@@ -34,4 +34,4 @@ spec:
       volumes:
       - name: mysql
         secret:
-          secretName: my-db-credentials-secretsmanager
+          secretName: mysql-credentials-secretsmanager
