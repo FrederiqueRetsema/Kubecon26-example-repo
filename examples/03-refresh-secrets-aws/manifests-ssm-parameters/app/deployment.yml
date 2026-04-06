@@ -2,19 +2,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gitops-secrets-deploy
+  name: gitops-secrets-deploy-ssm-parameters
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gitops-secrets-app
+      app: gitops-secrets-app-ssm-parameters
   template:
     metadata:
       labels:
-        app: gitops-secrets-app
+        app: gitops-secrets-app-ssm-parameters
     spec:
       containers:
-      - name: gitops-secrets-app
+      - name: gitops-secrets-app-ssm-parameters
         image: docker.io/kostiscodefresh/simple-secret-app:latest 
         imagePullPolicy: Always   
         ports:

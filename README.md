@@ -15,9 +15,6 @@ For every session that I liked you will find a seperate directory. All the examp
 You can go to the aws-deployment directory and copy the setenv.template.sh file to setenv.sh. Please look at the remarks in this directory before you deploy anything. When you configured the shell script setenv.sh, this file is used by the three other shell scripts in that directory. You can simply use the following commands to deploy the CloudFormation template to your own environment:
 
 ```
-./login.shdeployment directory and copy the setenv.template.sh file to setenv.sh. Please look at the remarks in this directory before you deploy anything. When you configured the shell script setenv.sh, this file is used by the three other shell scripts in that directory. You can simply use the following commands to deploy the CloudFormation template to your own environment:
-
-```
 . ./login.sh
 . ./start.sh
 ```
@@ -28,3 +25,13 @@ When you looked around and played with this, you can delete the environment usin
 . ./stop.sh
 ```
 
+## Port numbers
+
+The following portnumbers are used:
+
+| Port number | Used for                                  |
+| ----------- | ----------------------------------------- |
+| 30001       | 02-refresh-secrets                        |
+| 30002       | 03-refresh-secrets-aws, AWS secretsmanager|
+| 30007       | ArgoCD                                    |
+| 30008       | Keyvault (used in 02-refresh-secrets)     |
