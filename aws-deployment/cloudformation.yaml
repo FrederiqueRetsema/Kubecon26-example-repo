@@ -155,6 +155,7 @@ Resources:
             apt:
               git: []
               net-tools: []
+              unzip: []
           files:
             '/opt/xforce/01-initialize-files.sh':
               content: !Sub |
@@ -166,7 +167,7 @@ Resources:
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
-                find . -type f -exec sed -i 's/##AWSRegion##/'${AWS::Region}'/g' {} \;
+                find . -type f -exec sed -i 's/##AWS-Region##/'${AWS::Region}'/g' {} \;
 
           commands:
             01-initialize-files:
@@ -236,7 +237,6 @@ Resources:
           packages:
             apt:
               git: []
-              unzip: []
           files:
             '/opt/xforce/01-initialize-files.sh':
               content: !Sub |

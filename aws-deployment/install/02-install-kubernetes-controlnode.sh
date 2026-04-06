@@ -8,13 +8,6 @@ function os_update() {
   apt upgrade -y
 }
 
-function install_k9s() {
-  export HOME="/root"
-
-  curl -sS https://webinstall.dev/k9s | bash
-  cp ~/.local/bin/k9s /usr/local/bin
-}
-
 function install_aws_cli() {
   export HOME="/root"
 
@@ -22,6 +15,13 @@ function install_aws_cli() {
   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
   unzip awscliv2.zip
   ./aws/install
+}
+
+function install_k9s() {
+  export HOME="/root"
+
+  curl -sS https://webinstall.dev/k9s | bash
+  cp ~/.local/bin/k9s /usr/local/bin
 }
 
 function install_helm() {
@@ -220,6 +220,7 @@ function force_password_change() {
 }
 
 os_update
+install_aws_cli
 install_k9s
 install_helm
 

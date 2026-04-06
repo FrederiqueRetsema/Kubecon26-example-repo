@@ -5,7 +5,7 @@ function get_access_key_from_secret() {
 
   ACCESS_KEY=$(aws secretsmanager get-secret-value \
                                     --secret-id $SECRET_ID \
-                                    --region ##AWS-REGION## \
+                                    --region ##AWS-Region## \
                                     --query SecretString \
                                     --output text | jq -r '.access_key')
   echo $ACCESS_KEY
@@ -16,7 +16,7 @@ function get_secret_access_key_from_secret() {
 
   SECRET_ACCESS_KEY=$(aws secretsmanager get-secret-value \
                                     --secret-id $SECRET_IDvvi \
-                                    --region ##AWS-REGION## \
+                                    --region ##AWS-Region## \
                                     --query SecretString \
                                     --output text | jq -r '.secret_access_key')
   echo $SECRET_ACCESS_KEY
@@ -55,11 +55,12 @@ function argocd_wait_for_healty() {
       then
         break
       fi
-      echo "Wait another 10 seconds"
+      echo "Wait another 10 seconds (app: $APP)"
       sleep 10
   done
 }
 
+kubectl create namespace example-refresh-secrets-aws
 install_aws_secrets
 
 ARGOCD_PWD=$(argocd admin initial-password -n argocd | head -n 1)
@@ -87,7 +88,7 @@ argocd app create ssm-parameters-secret-store \
 --dest-server https://kubernetes.default.svc
 
 argocd_wait_for_healty secretsmanager-secret-store
-argocd_wait_for_healty create ssm-parameters-secret-store
+argocd_wait_for_healty ssm-parameters-secret-store
 sleep 5
 
 echo "Should show READY: True"
@@ -99,7 +100,7 @@ argocd app create my-secret-app-secretsmanager \
 --path "./examples/03-refresh-secrets-aws/manifests-secretsmanager/app" \
 --sync-policy auto \
 --sync-option CreateNamespace=true \
---dest-namespace example-refresh-secrets \
+--dest-namespace example-refresh-secrets-aws \
 --dest-server https://kubernetes.default.svc                  
 
 argocd app create my-secret-app-ssm-parameters \
@@ -108,5 +109,5 @@ argocd app create my-secret-app-ssm-parameters \
 --path "./examples/03-refresh-secrets-aws/manifests-ssm-parameters/app" \
 --sync-policy auto \
 --sync-option CreateNamespace=true \
---dest-namespace example-refresh-secrets \
+--dest-namespace example-refresh-secrets-aws \
 --dest-server https://kubernetes.default.svc                  

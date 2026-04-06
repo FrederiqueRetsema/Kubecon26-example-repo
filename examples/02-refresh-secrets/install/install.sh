@@ -17,7 +17,7 @@ function argocd_wait_for_healty() {
       then
         break
       fi
-      echo "Wait another 10 seconds"
+      echo "Wait another 10 seconds (app: $APP)"
       sleep 10
   done
 }
