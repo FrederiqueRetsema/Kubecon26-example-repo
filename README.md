@@ -33,5 +33,7 @@ The following portnumbers are used:
 | ----------- | ----------------------------------------- |
 | 30001       | 02-refresh-secrets                        |
 | 30002       | 03-refresh-secrets-aws, AWS secretsmanager|
+| 30003       | 03-refresh-secrets-aws, SSM Parameters    |
 | 30007       | ArgoCD                                    |
 | 30008       | Keyvault (used in 02-refresh-secrets)     |
+

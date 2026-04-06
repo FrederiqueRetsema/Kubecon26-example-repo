@@ -104,4 +104,3 @@ argocd app create my-secret-app \
 --dest-server https://kubernetes.default.svc                  
 
 allow_external_access vault vault 30008
-allow_external_access example-refresh-secrets gitops-secrets-service 30001
