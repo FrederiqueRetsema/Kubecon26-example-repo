@@ -1,0 +1,10 @@
+apiVersion: example.crossplane.io/v1
+kind: App
+metadata:
+  namespace: default
+  name: my-app
+spec:
+  image: nginx
+status:
+  replicas: 2  # Copied from the Deployment's status
+  address: 10.0.0.1  # Copied from the Service's status

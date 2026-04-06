@@ -1,0 +1,9 @@
+apiVersion: s3.aws.m.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  namespace: 04-crossplane
+  generateName: crossplane-bucket-
+spec:
+  forProvider:
+    region: ##AWS-Region##
+    

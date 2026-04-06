@@ -197,9 +197,18 @@ function install_external_secrets_operator() {
       --create-namespace
 }
 
+function install_crossplane() {
+  helm repo add crossplane-stable https://charts.crossplane.io/stable
+  helm repo update
+  helm install crossplane \
+    --namespace crossplane-system \
+    --create-namespace crossplane-stable/crossplane
+    --set args='{"--enable-operations"}'
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
-  EXAMPLES=$(ls)
+  EXAMPLES=$(ls -1| sort)
   for EXAMPLE in $EXAMPLES
   do
       bash $EXAMPLE/install/install.sh

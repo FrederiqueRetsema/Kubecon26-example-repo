@@ -119,6 +119,7 @@ Resources:
                 Resource:
                   - !Ref ExternalSecretsOperatorSSMCredentials
                   - !Ref ExternalSecretsOperatorSecretsCredentials
+                  - !Ref CrossplaneS3Credentials
 
   KubernetesIAMInstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
@@ -154,6 +155,7 @@ Resources:
           packages:
             apt:
               git: []
+              golang-go: []
               net-tools: []
               unzip: []
           files:
@@ -683,6 +685,56 @@ Resources:
         {"url"     : "mysql2.example.com:3306",
          "userid"  : "my_second_user",
          "password": "my_second_demo_password"}
+
+  CrossplaneS3Policy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowS3BucketManagement
+            Effect: "Allow"
+            Action:
+              - "s3:CreateBucket"
+              - "s3:DeleteBucket"
+              - "s3:GetAccelerateConfiguration"
+              - "s3:GetBucketAcl"
+              - "s3:GetBucketCORS"
+              - "s3:GetBucketLocation"
+              - "s3:GetBucketLogging"
+              - "s3:GetBucketObjectLockConfiguration"
+              - "s3:GetBucketPolicy"
+              - "s3:GetBucketRequestPayment"
+              - "s3:GetBucketTagging"
+              - "s3:GetBucketVersioning"
+              - "s3:GetBucketWebsite"
+              - "s3:GetEncryptionConfiguration"
+              - "s3:GetLifecycleConfiguration"
+              - "s3:GetReplicationConfiguration"
+              - "s3:ListBucket"
+              - "s3:PutBucketTagging"
+            Resource: "*"
+
+  CrossplaneS3User:
+    Type: "AWS::IAM::User"
+    Properties:
+      UserName: kubecon26-crossplane-s3
+      ManagedPolicyArns:
+        - !Ref CrossplaneS3Policy
+
+  CrossplaneS3AccessKey:
+    Type: "AWS::IAM::AccessKey"
+    Properties:
+      UserName: !Ref CrossplaneS3User
+
+  CrossplaneS3Credentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: kubecon26-crossplane-s3-credentials
+      SecretString: !Sub
+        - '{"access_key":"${AccessKey}","secret_access_key":"${SecretKey}"}'
+        - AccessKey: !Ref CrossplaneS3AccessKey
+          SecretKey: !GetAtt CrossplaneS3AccessKey.SecretAccessKey
 
 Outputs:
   ControlNodeId:
