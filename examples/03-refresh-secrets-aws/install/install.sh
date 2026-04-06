@@ -15,7 +15,7 @@ function get_secret_access_key_from_secret() {
   SECRET_ID=$1
 
   SECRET_ACCESS_KEY=$(aws secretsmanager get-secret-value \
-                                    --secret-id $SECRET_ID \
+                                    --secret-id $SECRET_IDvvi \
                                     --region ##AWS-REGION## \
                                     --query SecretString \
                                     --output text | jq -r '.secret_access_key')
@@ -60,14 +60,7 @@ function argocd_wait_for_healty() {
   done
 }
 
-function allow_external_access() {
-  NAMESPACE=$1
-  SERVICE=$2
-  EXTERNAL_PORT=$3
-
-  kubectl patch svc "$SERVICE" -n "$NAMESPACE" -p '{"spec": {"type": "NodePort"}}'
-  kubectl patch svc "$SERVICE" -n "$NAMESPACE" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/0/nodePort\", \"value\":$EXTERNAL_PORT}]"
-}
+install_aws_secrets
 
 ARGOCD_PWD=$(argocd admin initial-password -n argocd | head -n 1)
 ARGOCD_IP=$(kubectl get svc -n argocd argocd-server | tail -n 1 | awk '{print $3}')
@@ -77,29 +70,43 @@ argocd login $ARGOCD_IP:80 --username admin --password $ARGOCD_PWD --insecure
 
 sleep 10
 
-argocd app create vault-secret-store \
+argocd app create secretsmanager-secret-store \
 --project default \
 --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
---path "./examples/03-refresh-secrets/manifests/vault-integration" \
+--path "./examples/03-refresh-secrets-aws/manifests-secretsmanager/secretsmanager-integration" \
 --sync-policy auto \
 --dest-namespace external-secrets-aws \
 --dest-server https://kubernetes.default.svc
 
-argocd_wait_for_healty vault-secret-store
+argocd app create ssm-parameters-secret-store \
+--project default \
+--repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
+--path "./examples/03-refresh-secrets-aws/manifests-ssm-parameters/ssm-parameters-integration" \
+--sync-policy auto \
+--dest-namespace external-secrets-aws \
+--dest-server https://kubernetes.default.svc
+
+argocd_wait_for_healty secretsmanager-secret-store
+argocd_wait_for_healty create ssm-parameters-secret-store
 sleep 5
 
 echo "Should show READY: True"
 kubectl get clustersecretstore vault-backend 
 
-argocd app create my-secret-app \
+argocd app create my-secret-app-secretsmanager \
 --project default \
 --repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
---path "./examples/02-refresh-secrets/manifests/app" \
+--path "./examples/03-refresh-secrets-aws/manifests-secretsmanager/app" \
 --sync-policy auto \
 --sync-option CreateNamespace=true \
 --dest-namespace example-refresh-secrets \
 --dest-server https://kubernetes.default.svc                  
 
-install_aws_secrets
-allow_external_access vault vault 30008
-allow_external_access example-refresh-secrets gitops-secrets-service 30001
+argocd app create my-secret-app-ssm-parameters \
+--project default \
+--repo https://github.com/FrederiqueRetsema/Kubecon26-example-repo \
+--path "./examples/03-refresh-secrets-aws/manifests-ssm-parameters/app" \
+--sync-policy auto \
+--sync-option CreateNamespace=true \
+--dest-namespace example-refresh-secrets \
+--dest-server https://kubernetes.default.svc                  
