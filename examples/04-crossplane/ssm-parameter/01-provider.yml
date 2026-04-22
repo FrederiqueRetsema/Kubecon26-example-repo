@@ -3,4 +3,4 @@ kind: Provider
 metadata:
   name: crossplane-contrib-provider-aws-ssm
 spec:
-  package: xpkg.crossplane.io/crossplane-contrib/provider-aws-ssm:v2.5.2
+  package: xpkg.crossplane.io/crossplane-contrib/provider-aws-ssm:v2.5.0
