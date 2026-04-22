@@ -143,7 +143,7 @@ deploy() {
 
     kubectl apply -f "$SCRIPTNAME"
     wait_for_full_line "$SCRIPTNAME" "$WORDS_IN_FULL_LINE"
-    wait_for_result "$SCRIPTNAME" "$RESULT_NAME" "$EXPECTED_RESULT_VALUE" "RESULT_POSITION_IN_LINE"
+    wait_for_result "$SCRIPTNAME" "$RESULT_NAME" "$EXPECTED_RESULT_VALUE" "$RESULT_POSITION_IN_LINE"
 }
 
 # deploy_function() {
