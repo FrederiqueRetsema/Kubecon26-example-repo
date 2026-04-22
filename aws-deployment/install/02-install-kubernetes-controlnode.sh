@@ -228,14 +228,14 @@ function wait_for_namespace() {
   NAMESPACE=$1
 
   LINES=$(kubectl get pods -n "$NAMESPACE" | grep -v NAME | wc -l)
-  RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" || grep Running | wc -l)
+  RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" | grep Running | wc -l)
 
   while [[ "$LINES" != "$RUNNING_LINES" ]]
   do
       echo "Lines: $LINES, Running lines: $RUNNING_LINES, wait for 10 seconds..."
       sleep 10
       LINES=$(kubectl get pods -n "$NAMESPACE" | grep -v NAME | wc -l)
-      RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" || grep Running | wc -l)
+      RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" | grep Running | wc -l)
   done
   echo "All pods in namespace $NAMESPACE are running, continue"
 }
