@@ -2,3 +2,4 @@ PROFILE="default"
 CONSULTANT_NAME="my-name"
 
 STACKNAME="kubernetes-${CONSULTANT_NAME}"
+BRANCH_NAME="main"

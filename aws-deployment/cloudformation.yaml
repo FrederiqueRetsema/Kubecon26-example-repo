@@ -26,6 +26,9 @@ Parameters:
   ConsultantName:
     Type: String
     Default: Frederique
+  BranchName:
+    Type: String
+    Default: main
 
 Mappings:
   AWSManagedRoles:
@@ -165,7 +168,7 @@ Resources:
                 mkdir -p /clone
                 cd /clone
 
-                git clone https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
+                git clone -b ${BranchName} https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
@@ -246,7 +249,7 @@ Resources:
                 mkdir -p /clone
                 cd /clone
 
-                git clone https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
+                git clone -b ${BranchName} https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
@@ -325,7 +328,7 @@ Resources:
                 mkdir -p /clone
                 cd /clone
 
-                git clone https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
+                git clone -b ${BranchName} https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
