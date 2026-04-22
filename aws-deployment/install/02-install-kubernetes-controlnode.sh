@@ -169,6 +169,7 @@ function install_cilium() {
   rm cilium-linux-$CLI_ARCH.tar.gz{,.sha256sum}
 
   cilium install --set securityContext.privileged=true
+  cilium status --wait
 }
 
 function install_kgateway() {

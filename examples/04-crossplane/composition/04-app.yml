@@ -1,7 +1,7 @@
 apiVersion: example.crossplane.io/v1
 kind: App
 metadata:
-  namespace: default
+  namespace: 04-crossplane
   name: my-app
 spec:
   image: nginx
