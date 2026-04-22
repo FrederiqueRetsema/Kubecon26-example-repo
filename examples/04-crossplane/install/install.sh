@@ -69,30 +69,11 @@ function wait_for_result() {
         echo "Wait 2 seconds..."
         sleep 2
         OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
-        REAL_RESULT=$(echo "$OUTPUT" | awk awk '{print $'$POSITION'}')
+        REAL_RESULT=$(echo "$OUTPUT" | awk '{print $'$POSITION'}')
     done
 
     echo "Output: $OUTPUT"
     echo "$SCRIPTNAME = $RESULT_NAME"
-}
-
-function wait_for_healthy() {
-    SCRIPTNAME=$1
-
-    OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
-    HEALTHY=$(echo "$OUTPUT" | awk '{print $3}')
-    while [[ "$HEALTHY" != "True" ]]
-    do
-        echo "Output: $OUTPUT"
-        echo "Expected health True != Real health $HEALTHY"
-        echo "Wait 2 seconds..."
-        sleep 2
-        OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
-        HEALTHY=$(echo "$OUTPUT" | awk '{print $3}')
-    done
-
-    echo "Output: $OUTPUT"
-    echo "$SCRIPTNAME = Healthy"
 }
 
 function wait_for_established() {
@@ -153,47 +134,58 @@ function wait_for_ready() {
     echo "$SCRIPTNAME = Ready"
 }
 
-deploy_function() {
-    SCRIPTNAME="01-fn.yml"
+deploy() {
+    SCRIPTNAME=$1
+    WORDS_IN_FULL_LINE=$2
+    RESULT_NAME=$3
+    EXPECTED_RESULT_VALUE=$4
+    RESULT_POSITION_IN_LINE=$5
 
     kubectl apply -f "$SCRIPTNAME"
-    wait_for_full_line "$SCRIPTNAME" 5
-    wait_for_result "$SCRIPTNAME" "health" "True" 3
-    echo "==="
-    wait_for_health "$SCRIPTNAME" 
+    wait_for_full_line "$SCRIPTNAME" "$WORDS_IN_FULL_LINE"
+    wait_for_result "$SCRIPTNAME" "$RESULT_NAME" "$EXPECTED_RESULT_VALUE" "RESULT_POSITION_IN_LINE"
 }
 
-function deploy_xrd() {
-    SCRIPTNAME="02-xrd.yml"
+# deploy_function() {
+#     SCRIPTNAME="01-fn.yml"
 
-    kubectl apply -f "$SCRIPTNAME"
-    wait_for_full_line "$SCRIPTNAME" 3
-    wait_for_established "$SCRIPTNAME"
-}
+#     kubectl apply -f "$SCRIPTNAME"
+#     wait_for_full_line "$SCRIPTNAME" 5
+#     wait_for_result "$SCRIPTNAME" "health" "True" 3
+# }
 
-function deploy_composition() {
-    SCRIPTNAME="03-composition.yml"
+# function deploy_xrd() {
+#     SCRIPTNAME="02-xrd.yml"
 
-    kubectl apply -f "$SCRIPTNAME"
-    wait_for_composition "$SCRIPTNAME"
-}
+#     kubectl apply -f "$SCRIPTNAME"
+#     wait_for_full_line "$SCRIPTNAME" 3
+#     wait_for_result "$SCRIPTNAME" "established" "True" 2
+# }
 
-function deploy_app() {
-    SCRIPTNAME="04-app.yml"
+# function deploy_composition() {
+#     SCRIPTNAME="03-composition.yml"
 
-    kubectl apply -f "$SCRIPTNAME"
-    wait_for_full_line "$SCRIPTNAME" 5
-    wait_for_ready "$SCRIPTNAME"
-}
+#     kubectl apply -f "$SCRIPTNAME"
+#     wait_for_full_line "$SCRIPTNAME" 4
+#     wait_for_result "$SCRIPTNAME" "name" "app-yaml" 1
+# }
+
+# function deploy_app() {
+#     SCRIPTNAME="04-app.yml"
+
+#     kubectl apply -f "$SCRIPTNAME"
+#     wait_for_full_line "$SCRIPTNAME" 5
+#     wait_for_ready "$SCRIPTNAME"
+# }
 
 function load_scripts_composition() {
     DIR="/clone/Kubecon26-example-repo/examples/04-crossplane/composition"
     cd $DIR
 
-    deploy_function
-    deploy_xrd
-    deploy_composition
-    deploy_app
+    deploy "01-fn.yml"          5 "health"      "True"     3
+    deploy "02-xrd.yml"         3 "established" "True"     2
+    deploy "03-composition.yml" 4 "name"        "app-yaml" 1
+    deploy "04-app.yml"         5 "ready"       "True"     3
     cd -
 }
 
