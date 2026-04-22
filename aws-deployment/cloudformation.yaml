@@ -8,7 +8,7 @@ Parameters:
     Default: /aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id
   EC2InstanceType:
     Type: String
-    Default: t2.large  # t2.large is 8 GiB ram, 2 vCPUs - this should be enough for a test environment
+    Default: t3.xlarge  # t3.xlarge is 16 GiB ram, 4 vCPUs - this should be enough for this test environment
 
   PrivateIpControl:
     Type: String

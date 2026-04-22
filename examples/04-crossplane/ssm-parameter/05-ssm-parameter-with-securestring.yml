@@ -7,5 +7,7 @@ metadata:
 spec:
   forProvider:
     type: SecureString
-    insecureValue: hello-from-crossplane
+    valueSecretRef:
+      name: crossplane-demo-securestring-value
+      key: value
     region: ##AWS-Region##
