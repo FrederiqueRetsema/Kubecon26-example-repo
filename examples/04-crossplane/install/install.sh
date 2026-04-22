@@ -54,6 +54,28 @@ function wait_for_full_line() {
     done
 }
 
+function wait_for_result() {
+    SCRIPTNAME=$1
+    RESULT_NAME=$2
+    EXPECTED_RESULT=$3
+    POSITION=$4
+
+    OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
+    REAL_RESULT=$(echo "$OUTPUT" | awk '{print $'$POSITION'}')
+    while [[ "$REAL_RESULT" != "$EXPECTED_RESULT" ]]
+    do
+        echo "Output: $OUTPUT"
+        echo "Expected $RESULT_NAME $EXPECTED_RESULT != Real $RESULT_NAME $REAL_RESULT"
+        echo "Wait 2 seconds..."
+        sleep 2
+        OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
+        REAL_RESULT=$(echo "$OUTPUT" | awk awk '{print $'$POSITION'}')
+    done
+
+    echo "Output: $OUTPUT"
+    echo "$SCRIPTNAME = $RESULT_NAME"
+}
+
 function wait_for_healthy() {
     SCRIPTNAME=$1
 
@@ -100,7 +122,7 @@ function wait_for_composition() {
     while [[ "$DEPLOYED" != "app-yaml" ]]
     do
         echo "Output: $OUTPUT"
-        echo "Expected output (no message 'not found') != Real health $OUTPUT"
+        echo "Expected output app-yaml != Real health $OUTPUT"
         echo "Wait 2 seconds..."
         kubectl apply -f "$SCRIPTNAME"
         sleep 2
@@ -136,7 +158,9 @@ deploy_function() {
 
     kubectl apply -f "$SCRIPTNAME"
     wait_for_full_line "$SCRIPTNAME" 5
-    wait_for_healthy "$SCRIPTNAME"
+    wait_for_result "$SCRIPTNAME" "health" "True" 3
+    echo "==="
+    wait_for_health "$SCRIPTNAME" 
 }
 
 function deploy_xrd() {
