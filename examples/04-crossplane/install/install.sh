@@ -68,6 +68,8 @@ function wait_for_healthy() {
         OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
         HEALTHY=$(echo "$OUTPUT" | awk '{print $3}')
     done
+
+    echo "Output: $OUTPUT"
     echo "$SCRIPTNAME = Healthy"
 }
 
@@ -85,6 +87,8 @@ function wait_for_established() {
         OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
         ESTABLISHED=$(echo "$OUTPUT" | awk '{print $2}')
     done
+
+    echo "Output: $OUTPUT"
     echo "$SCRIPTNAME = Established"
 }
 
@@ -103,6 +107,8 @@ function wait_for_composition() {
         OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
         DEPLOYED=$(echo "$OUTPUT" | grep "not found")
     done
+
+    echo "Output: $OUTPUT"
     echo "$SCRIPTNAME = Deployed"
 }
 
@@ -120,6 +126,8 @@ function wait_for_ready() {
         OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
         READY=$(echo "$OUTPUT" | awk '{print $3}')
     done
+
+    echo "Output: $OUTPUT"
     echo "$SCRIPTNAME = Ready"
 }
 
