@@ -73,7 +73,7 @@ function wait_for_result() {
     done
 
     echo "Output: $OUTPUT"
-    echo "$SCRIPTNAME : $RESULT_NAME = $REAL_OUTPUT"
+    echo "$SCRIPTNAME : $RESULT_NAME = $REAL_RESULT"
 }
 
 deploy() {
