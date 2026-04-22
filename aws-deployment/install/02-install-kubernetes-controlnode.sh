@@ -258,6 +258,6 @@ echo "$(date +%H:%M:%S) Wait for 3 minutes..."
 sleep 180
 install_examples
 
-echo $(date +%H:%M:%S) wait 3 minutes
-sleep 180
+echo $(date +%H:%M:%S) wait 5 minutes for example ArgoCD
+sleep 300
 force_password_change
