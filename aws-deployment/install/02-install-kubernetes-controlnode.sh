@@ -254,10 +254,10 @@ install_kgateway
 install_argocd
 install_external_secrets_operator
 install_crossplane
-echo "$(date +%H:%M:%S) Wait for 3 minutes..."
-sleep 180
+echo "$(date +%H:%M:%S) Wait for 5 minutes for example for ArgoCD..."
+sleep 300
 install_examples
 
-echo $(date +%H:%M:%S) wait 5 minutes for example ArgoCD
-sleep 300
+echo $(date +%H:%M:%S) wait 3 minutes
+sleep 180
 force_password_change
