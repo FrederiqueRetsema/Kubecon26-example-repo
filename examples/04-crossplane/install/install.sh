@@ -96,8 +96,8 @@ function wait_for_composition() {
     SCRIPTNAME=$1
 
     OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
-    DEPLOYED=$(echo "$OUTPUT" | grep "not found")
-    while [[ "$DEPLOYED" != "" ]]
+    DEPLOYED=$(echo "$OUTPUT" | awk '{print $1}')
+    while [[ "$DEPLOYED" != "app-yaml" ]]
     do
         echo "Output: $OUTPUT"
         echo "Expected output (no message 'not found') != Real health $OUTPUT"
@@ -105,7 +105,7 @@ function wait_for_composition() {
         kubectl apply -f "$SCRIPTNAME"
         sleep 2
         OUTPUT=$(kubectl get -f "$SCRIPTNAME" | tail -n 1)
-        DEPLOYED=$(echo "$OUTPUT" | grep "not found")
+        DEPLOYED=$(echo "$OUTPUT" | awk '{print $1}')
     done
 
     echo "Output: $OUTPUT"
