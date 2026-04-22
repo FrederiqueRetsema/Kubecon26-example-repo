@@ -8,7 +8,7 @@ Parameters:
     Default: /aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id
   EC2InstanceType:
     Type: String
-    Default: t2.large  # t2.large is 8 GiB ram, 2 vCPUs - this should be enough for a test environment
+    Default: t3.xlarge  # t3.xlarge is 16 GiB ram, 4 vCPUs - this should be enough for this test environment
 
   PrivateIpControl:
     Type: String
@@ -26,6 +26,21 @@ Parameters:
   ConsultantName:
     Type: String
     Default: Frederique
+  BranchName:
+    Type: String
+    Default: main
+  DeleteStackAutomatically:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+  DeleteStackAfterHours:
+    Type: Number
+    Default: 12
+
+Conditions:
+  ShouldAutoDelete: !Equals [!Ref DeleteStackAutomatically, "true"]
 
 Mappings:
   AWSManagedRoles:
@@ -119,7 +134,7 @@ Resources:
                 Resource:
                   - !Ref ExternalSecretsOperatorSSMCredentials
                   - !Ref ExternalSecretsOperatorSecretsCredentials
-                  - !Ref CrossplaneS3Credentials
+                  - !Ref CrossplaneCredentials
 
   KubernetesIAMInstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
@@ -165,7 +180,7 @@ Resources:
                 mkdir -p /clone
                 cd /clone
 
-                git clone https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
+                git clone -b ${BranchName} https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
@@ -246,7 +261,7 @@ Resources:
                 mkdir -p /clone
                 cd /clone
 
-                git clone https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
+                git clone -b ${BranchName} https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
@@ -325,7 +340,7 @@ Resources:
                 mkdir -p /clone
                 cd /clone
 
-                git clone https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
+                git clone -b ${BranchName} https://github.com/FrederiqueRetsema/Kubecon26-example-repo.git
 
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
@@ -686,7 +701,7 @@ Resources:
          "userid"  : "my_second_user",
          "password": "my_second_demo_password"}
 
-  CrossplaneS3Policy:
+  CrossplanePolicy:
     Type: "AWS::IAM::ManagedPolicy"
     Properties:
       PolicyDocument:
@@ -714,27 +729,148 @@ Resources:
               - "s3:ListBucket"
               - "s3:PutBucketTagging"
             Resource: "*"
+          - Sid: AllowSSMParameterManagement
+            Effect: "Allow"
+            Action:
+              - "ssm:PutParameter"
+              - "ssm:GetParameter"
+              - "ssm:GetParameters"
+              - "ssm:DeleteParameter"
+              - "ssm:ListTagsForResource"
+              - "ssm:AddTagsToResource"
+              - "ssm:RemoveTagsFromResource"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/kubecon26/examples/04-crossplane/*"
+          - Sid: AllowSSMDescribeParameters
+            Effect: "Allow"
+            Action:
+              - "ssm:DescribeParameters"
+            Resource: "*"
+          - Sid: AllowSecretsManagerManagement
+            Effect: "Allow"
+            Action:
+              - "secretsmanager:CreateSecret"
+              - "secretsmanager:DeleteSecret"
+              - "secretsmanager:DescribeSecret"
+              - "secretsmanager:GetSecretValue"
+              - "secretsmanager:PutSecretValue"
+              - "secretsmanager:UpdateSecret"
+              - "secretsmanager:TagResource"
+              - "secretsmanager:UntagResource"
+              - "secretsmanager:GetResourcePolicy"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:kubecon26/examples/04-crossplane/*"
 
-  CrossplaneS3User:
+  CrossplaneUser:
     Type: "AWS::IAM::User"
     Properties:
-      UserName: kubecon26-crossplane-s3
+      UserName: kubecon26-crossplane
       ManagedPolicyArns:
-        - !Ref CrossplaneS3Policy
+        - !Ref CrossplanePolicy
 
-  CrossplaneS3AccessKey:
+  CrossplaneAccessKey:
     Type: "AWS::IAM::AccessKey"
     Properties:
-      UserName: !Ref CrossplaneS3User
+      UserName: !Ref CrossplaneUser
 
-  CrossplaneS3Credentials:
+  CrossplaneCredentials:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: kubecon26-crossplane-s3-credentials
+      Name: kubecon26-crossplane-credentials
       SecretString: !Sub
         - '{"access_key":"${AccessKey}","secret_access_key":"${SecretKey}"}'
-        - AccessKey: !Ref CrossplaneS3AccessKey
-          SecretKey: !GetAtt CrossplaneS3AccessKey.SecretAccessKey
+        - AccessKey: !Ref CrossplaneAccessKey
+          SecretKey: !GetAtt CrossplaneAccessKey.SecretAccessKey
+
+  # Auto-delete stack
+  # =================
+
+  AutoDeleteExecutionRole:
+    Type: "AWS::IAM::Role"
+    Condition: ShouldAutoDelete
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+              - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: "AutoDeleteStackPolicies"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CloudWatch
+                Effect: "Allow"
+                Action:
+                  - "logs:PutLogEvents"
+                  - "logs:CreateLogStream"
+                  - "logs:CreateLogGroup"
+                Resource: "*"
+              - Sid: CloudFormation
+                Effect: "Allow"
+                Action:
+                  - "cloudformation:DeleteStack"
+                Resource: !Ref "AWS::StackId"
+              - Sid: AllResources
+                Effect: "Allow"
+                Action:
+                  - "ec2:*"
+                  - "iam:*"
+                  - "lambda:*"
+                  - "s3:*"
+                  - "ecr:*"
+                  - "ssm:*"
+                  - "secretsmanager:*"
+                  - "events:*"
+                Resource: "*"
+      Path: /
+
+  AutoDeleteFunction:
+    Type: AWS::Lambda::Function
+    Condition: ShouldAutoDelete
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt AutoDeleteExecutionRole.Arn
+      Timeout: 60
+      Code:
+        ZipFile: !Sub |
+          import boto3
+
+          def lambda_handler(event, context):
+            try:
+                cfn = boto3.client('cloudformation')
+                stack_name = '${AWS::StackName}'
+                print(f"Deleting stack {stack_name}")
+                cfn.delete_stack(StackName=stack_name)
+                print(f"Stack deletion initiated for {stack_name}")
+            except Exception as e:
+                print(f"Error deleting stack: {e}")
+                raise
+      Runtime: python3.13
+
+  AutoDeleteScheduleRule:
+    Type: AWS::Events::Rule
+    Condition: ShouldAutoDelete
+    Properties:
+      Description: !Sub "Auto-delete stack ${AWS::StackName} after ${DeleteStackAfterHours} hours"
+      ScheduleExpression: !Sub "rate(${DeleteStackAfterHours} hours)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt AutoDeleteFunction.Arn
+          Id: AutoDeleteTarget
+
+  AutoDeleteLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Condition: ShouldAutoDelete
+    Properties:
+      FunctionName: !Ref AutoDeleteFunction
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt AutoDeleteScheduleRule.Arn
 
 Outputs:
   ControlNodeId:

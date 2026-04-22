@@ -202,7 +202,7 @@ function install_crossplane() {
   helm repo update
   helm install crossplane \
     --namespace crossplane-system \
-    --create-namespace crossplane-stable/crossplane
+    --create-namespace crossplane-stable/crossplane \
     --set args='{"--enable-operations"}'
 }
 
@@ -253,6 +253,7 @@ install_cilium
 install_kgateway
 install_argocd
 install_external_secrets_operator
+install_crossplane
 echo "$(date +%H:%M:%S) Wait for 3 minutes..."
 sleep 180
 install_examples
