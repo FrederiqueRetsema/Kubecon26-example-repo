@@ -23,8 +23,8 @@ function get_secret_access_key_from_secret() {
 }
 
 function install_aws_secrets() {
-  ACCESS_KEY_S3=$(get_access_key_from_secret kubecon26-crossplane-s3-credentials)
-  SECRET_ACCESS_KEY_S3=$(get_secret_access_key_from_secret kubecon26-crossplane-s3-credentials)
+  ACCESS_KEY_S3=$(get_access_key_from_secret kubecon26-crossplane-credentials)
+  SECRET_ACCESS_KEY_S3=$(get_secret_access_key_from_secret kubecon26-crossplane-credentials)
 
   echo "[default]" > /tmp/$$
   echo "aws_access_key_id = $ACCESS_KEY_S3" >> /tmp/$$

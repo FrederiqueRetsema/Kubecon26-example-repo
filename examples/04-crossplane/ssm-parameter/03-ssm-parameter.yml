@@ -1,0 +1,11 @@
+apiVersion: ssm.aws.m.upbound.io/v1beta1
+kind: Parameter
+metadata:
+  name: crossplane-demo-parameter
+  annotations:
+    crossplane.io/external-name: /kubecon26/examples/04-crossplane/demo-parameter
+spec:
+  forProvider:
+    type: String
+    insecureValue: hello-from-crossplane
+    region: ##AWS-Region##
