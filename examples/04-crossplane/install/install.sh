@@ -155,7 +155,7 @@ function deploy_app() {
 }
 
 function load_scripts_composition() {
-    DIR=$1
+    DIR="/clone/Kubecon26-example-repo/examples/04-crossplane/composition"
     cd $DIR
 
     deploy_function
