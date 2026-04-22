@@ -122,7 +122,7 @@ Resources:
                 Resource:
                   - !Ref ExternalSecretsOperatorSSMCredentials
                   - !Ref ExternalSecretsOperatorSecretsCredentials
-                  - !Ref CrossplaneS3Credentials
+                  - !Ref CrossplaneCredentials
 
   KubernetesIAMInstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
@@ -689,7 +689,7 @@ Resources:
          "userid"  : "my_second_user",
          "password": "my_second_demo_password"}
 
-  CrossplaneS3Policy:
+  CrossplanePolicy:
     Type: "AWS::IAM::ManagedPolicy"
     Properties:
       PolicyDocument:
@@ -717,27 +717,58 @@ Resources:
               - "s3:ListBucket"
               - "s3:PutBucketTagging"
             Resource: "*"
+          - Sid: AllowSSMParameterManagement
+            Effect: "Allow"
+            Action:
+              - "ssm:PutParameter"
+              - "ssm:GetParameter"
+              - "ssm:GetParameters"
+              - "ssm:DeleteParameter"
+              - "ssm:ListTagsForResource"
+              - "ssm:AddTagsToResource"
+              - "ssm:RemoveTagsFromResource"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/kubecon26/examples/04-crossplane/*"
+          - Sid: AllowSSMDescribeParameters
+            Effect: "Allow"
+            Action:
+              - "ssm:DescribeParameters"
+            Resource: "*"
+          - Sid: AllowSecretsManagerManagement
+            Effect: "Allow"
+            Action:
+              - "secretsmanager:CreateSecret"
+              - "secretsmanager:DeleteSecret"
+              - "secretsmanager:DescribeSecret"
+              - "secretsmanager:GetSecretValue"
+              - "secretsmanager:PutSecretValue"
+              - "secretsmanager:UpdateSecret"
+              - "secretsmanager:TagResource"
+              - "secretsmanager:UntagResource"
+              - "secretsmanager:GetResourcePolicy"
+            Resource:
+              - !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:kubecon26/examples/04-crossplane/*"
 
-  CrossplaneS3User:
+  CrossplaneUser:
     Type: "AWS::IAM::User"
     Properties:
-      UserName: kubecon26-crossplane-s3
+      UserName: kubecon26-crossplane
       ManagedPolicyArns:
-        - !Ref CrossplaneS3Policy
+        - !Ref CrossplanePolicy
 
-  CrossplaneS3AccessKey:
+  CrossplaneAccessKey:
     Type: "AWS::IAM::AccessKey"
     Properties:
-      UserName: !Ref CrossplaneS3User
+      UserName: !Ref CrossplaneUser
 
-  CrossplaneS3Credentials:
+  CrossplaneCredentials:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: kubecon26-crossplane-s3-credentials
+      Name: kubecon26-crossplane-credentials
       SecretString: !Sub
         - '{"access_key":"${AccessKey}","secret_access_key":"${SecretKey}"}'
-        - AccessKey: !Ref CrossplaneS3AccessKey
-          SecretKey: !GetAtt CrossplaneS3AccessKey.SecretAccessKey
+        - AccessKey: !Ref CrossplaneAccessKey
+          SecretKey: !GetAtt CrossplaneAccessKey.SecretAccessKey
 
 Outputs:
   ControlNodeId:
