@@ -37,8 +37,16 @@ function install_aws_secrets() {
   rm /tmp/$$
 }
 
+function load_scripts() {
+    DIR=$1
+    cd $DIR
+    ls -1 | sort | awk '{print "kubectl create -n 04-crossplane -f "$1}' | bash
+    cd -
+}
+
 kubectl create namespace 04-crossplane
 install_aws_secrets
 
-# Don't load scripts for Crossplane: when you delete the cluster, the objects that crossplane
-# creates will stay.
+# Only load scripts that don't create AWS resources (they will stay in AWS when
+# you delete the cluster without deleting the resources within Kubernetes first)
+load_scripts /clone/Kubecon26-example-repo/examples/04-crossplane/composition
