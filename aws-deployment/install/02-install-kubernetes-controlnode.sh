@@ -169,6 +169,7 @@ function install_cilium() {
   rm cilium-linux-$CLI_ARCH.tar.gz{,.sha256sum}
 
   cilium install --set securityContext.privileged=true
+  cilium status --wait
 }
 
 function install_kgateway() {
@@ -224,6 +225,23 @@ function allow_external_access() {
   kubectl patch svc "$SERVICE" -n "$NAMESPACE" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/0/nodePort\", \"value\":$EXTERNAL_PORT}]"
 }
 
+function wait_for_namespace() {
+  NAMESPACE=$1
+
+  LINES=$(kubectl get pods -n "$NAMESPACE" | grep -v NAME | wc -l)
+  RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" | grep "1/1" | wc -l)
+
+  while [[ "$LINES" != "$RUNNING_LINES" ]]
+  do
+      echo "Lines: $LINES, Running lines: $RUNNING_LINES, wait for 10 seconds..."
+      sleep 10
+      kubectl get pods -n "$NAMESPACE"
+      LINES=$(kubectl get pods -n "$NAMESPACE" | grep -v NAME | wc -l)
+      RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" | grep "1/1" | wc -l)
+  done
+  echo "All pods in namespace $NAMESPACE are running, continue"
+}
+
 function force_password_change() {
   passwd -e kubernetes
 }
@@ -254,8 +272,12 @@ install_kgateway
 install_argocd
 install_external_secrets_operator
 install_crossplane
-echo "$(date +%H:%M:%S) Wait for 3 minutes..."
-sleep 180
+echo "$(date +%H:%M:%S) Wait for deployments..."
+wait_for_namespace "crossplane-system"
+wait_for_namespace "external-secrets"
+wait_for_namespace "argocd"
+
+echo "$(date +%H:%M:%S) Continue with deployment of examples..."
 install_examples
 
 echo $(date +%H:%M:%S) wait 3 minutes
