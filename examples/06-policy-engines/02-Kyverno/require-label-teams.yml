@@ -18,4 +18,4 @@ spec:
                 size(object.metadata.labels['team']) > 0) ||
                ('namespace' in object.metadata &&
                 object.metadata.namespace != "06-policy-engines-kyverno") ||
-               !('namespace' in object.metadata)
+               (!('namespace' in object.metadata))
