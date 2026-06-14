@@ -19,6 +19,7 @@ function create-namespace() {
 
 create-namespace "${NAMESPACE}"
 create-namespace "${NAMESPACE}-vap"
+create-namespace "${NAMESPACE}-kyverno"
 
 create-namespace "${NAMESPACE}-no-policies"
 kubectl label namespace "${NAMESPACE}-no-policies" policy-enforcement=disabled

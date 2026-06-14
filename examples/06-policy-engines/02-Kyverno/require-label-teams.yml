@@ -1,0 +1,19 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+   name: require-labels
+spec:
+   validationActions:
+      - Deny # or Audit
+   matchConstraints:
+       resourceRules:
+         - apiGroups: ['']
+           apiVersions: ['v1']
+           operations: ['CREATE', 'UPDATE']
+           resources: ['pods']
+   validations:
+      - message: "The label 'team' is required in namespace 06-policy-engines-kyverno."
+        expression: >-
+               'team' in object.metadata.?labels.orValue({}) &&
+               size(object.metadata.labels['team']) > 0 ||
+               object.metadata.namespace != "06-policy-engines-kyverno"
