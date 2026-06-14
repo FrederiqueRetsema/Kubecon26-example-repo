@@ -26,4 +26,6 @@ create-namespace "${NAMESPACE}-no-policies"
 kubectl label namespace "${NAMESPACE}-no-policies" policy-enforcement=disabled
 
 load_scripts 01-ValidatingAdmissionPolicy "${NAMESPACE}-vap"
+load_scripts 02-Kyverno                   "${NAMESPACE}-kyverno"
+load_scripts 03-Gatekeeper                "${NAMESPACE}-gatekeeper"
 
