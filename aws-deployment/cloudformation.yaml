@@ -28,7 +28,7 @@ Parameters:
     Default: Frederique
   BranchName:
     Type: String
-    Default: policy-engines
+    Default: main
   DeleteStackAutomatically:
     Type: String
     Default: "true"
