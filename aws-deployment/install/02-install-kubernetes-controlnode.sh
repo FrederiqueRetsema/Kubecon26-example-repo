@@ -250,6 +250,12 @@ function install_opentelemetry() {
   configure_opentelemetry
 }
 
+function install_kyverno() {
+  helm repo add kyverno https://kyverno.github.io/kyverno/
+  helm repo update
+  helm install kyverno kyverno/kyverno -n kyverno --create-namespace  
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls -1| sort)
@@ -318,6 +324,7 @@ install_crossplane
 install_prometheus_grafana
 install_jaeger
 install_opentelemetry
+install_kyverno
 echo "$(date +%H:%M:%S) Wait for deployments..."
 wait_for_namespace "crossplane-system"
 wait_for_namespace "external-secrets"
