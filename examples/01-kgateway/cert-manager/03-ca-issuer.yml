@@ -1,0 +1,10 @@
+# You would normally use a cluster issuer here, see: https://cert-manager.io/docs/configuration/selfsigned/
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ca-issuer
+  namespace: 01-example-kgateway
+spec:
+  ca:
+    secretName: root-secret

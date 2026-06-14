@@ -173,9 +173,9 @@ function install_cilium() {
 }
 
 function install_kgateway() {
-  helm install kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds --version v2.2.2 --namespace kgateway-system --create-namespace
-  helm install kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --version v2.2.2 --namespace kgateway-system --create-namespace
-  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+  helm install kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds --version v2.3.3 --namespace kgateway-system --create-namespace
+  helm install kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --version v2.3.3 --namespace kgateway-system --create-namespace
+  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
 }
 
 function install_argocd() {                  
@@ -261,6 +261,10 @@ function install_gatekeeper() {
   helm install gatekeeper/gatekeeper --name-template=gatekeeper --namespace gatekeeper-system --create-namespace
 }
 
+function install_cert_manager() {
+  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.2/cert-manager.yaml
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls -1| sort)
@@ -331,12 +335,17 @@ install_jaeger
 install_opentelemetry
 install_kyverno
 install_gatekeeper
+install_cert_manager
 echo "$(date +%H:%M:%S) Wait for deployments..."
-wait_for_namespace "crossplane-system"
-wait_for_namespace "external-secrets"
+wait_for_namespace "kgateway-system"
 wait_for_namespace "argocd"
+wait_for_namespace "external-secrets"
+wait_for_namespace "crossplane-system"
 wait_for_namespace "monitoring"
 wait_for_namespace "jaeger"
+wait_for_namespace "kyverno"
+wait_for_namespace "gatekeeper-system"
+wait_for_namespace "cert-manager"
 
 echo "$(date +%H:%M:%S) Continue with deployment of examples..."
 install_examples
