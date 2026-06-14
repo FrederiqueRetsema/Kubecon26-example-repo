@@ -256,6 +256,11 @@ function install_kyverno() {
   helm install kyverno kyverno/kyverno -n kyverno --create-namespace  
 }
 
+function install_gatekeeper() {
+  helm repo add gatekeeper https://open-policy-agent.github.io/gatekeeper/charts
+  helm install gatekeeper/gatekeeper --name-template=gatekeeper --namespace gatekeeper-system --create-namespace
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls -1| sort)
@@ -325,6 +330,7 @@ install_prometheus_grafana
 install_jaeger
 install_opentelemetry
 install_kyverno
+install_gatekeeper
 echo "$(date +%H:%M:%S) Wait for deployments..."
 wait_for_namespace "crossplane-system"
 wait_for_namespace "external-secrets"

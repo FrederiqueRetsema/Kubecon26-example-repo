@@ -24,5 +24,12 @@ kubectl apply -f test-kyverno-pod-without-team.yml -n 06-policy-engines-no-polic
 
 kubectl apply -f test-kyverno-pod-without-resources -n 06-policy-engines-kyverno
 kubectl get pod test-pod-no-resources -n 06-policy-engines-kyverno -o yaml            # 
+```
 
+# Gatekeeper
+
+```
+kubectl apply -f test-gatekeeper-pod-without-team.yml -n 06-policy-engines-gatekeeper    # will fail
+kubectl apply -f test-gatekeeper-pod-without-team.yml -n 06-policy-engines-no-policies   # will not fail
+kubectl apply -f test-gatekeeper-pod-with-team.yml -n 06-policy-engines-gatekeeper       # will not fail
 ```

@@ -14,6 +14,8 @@ spec:
    validations:
       - message: "The label 'team' is required in namespace 06-policy-engines-kyverno."
         expression: >-
-               'team' in object.metadata.?labels.orValue({}) &&
-               size(object.metadata.labels['team']) > 0 ||
-               object.metadata.namespace != "06-policy-engines-kyverno"
+               ('team' in object.metadata.?labels.orValue({}) &&
+                size(object.metadata.labels['team']) > 0) ||
+               ('namespace' in object.metadata &&
+                object.metadata.namespace != "06-policy-engines-kyverno") ||
+               !('namespace' in object.metadata)

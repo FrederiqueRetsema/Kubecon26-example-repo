@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-no-team
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
