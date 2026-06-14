@@ -127,9 +127,9 @@ function install_kubernetes_control() {
 
   # Link: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
   mkdir -p -m 755 /etc/apt/keyrings
-  curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
-  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
+  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.36/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list
   apt update
   apt-get install -y kubelet kubeadm kubectl
   apt-mark hold kubelet kubeadm kubectl
@@ -207,6 +207,60 @@ function install_crossplane() {
     --set args='{"--enable-operations"}'
 }
 
+function install_prometheus_grafana() {
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  helm repo update
+  helm install kube-prometheus-stack \
+    prometheus-community/kube-prometheus-stack \
+    --namespace monitoring \
+    --create-namespace \
+    --set grafana.adminPassword='##DefaultPassword##'
+  allow_external_access monitoring kube-prometheus-stack-grafana 30010
+  allow_external_access monitoring kube-prometheus-stack-prometheus 30011
+}
+
+function install_jaeger() {
+  helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+  helm repo update
+  helm install jaeger \
+    jaegertracing/jaeger \
+    --namespace jaeger \
+    --create-namespace \
+    --set allInOne.enabled=true \
+    --set provisionDataStore.cassandra=false \
+    --set storage.type=memory \
+    --set agent.enabled=false \
+    --set collector.enabled=false \
+    --set query.enabled=false
+  allow_external_access jaeger jaeger-query 30012
+}
+
+function configure_opentelemetry() {
+  kubedtl delete configmap opentelemetry-collector-agent -n opentelemetry
+  kubectl create configmap opentelemetry-collector-agent --from-file=/opt/xforce/otel/05-opentelemetry.yaml --namespace opentelemetry
+  kubectl get pods -n opentelemetry | grep -v NAME | awk '{print "kubectl delete pod -n opentelemetry "$1}'|bash
+}
+
+function install_opentelemetry() {
+  kubectl create namespace opentelemetry
+  helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+  helm install opentelemetry-collector open-telemetry/opentelemetry-collector \
+   --set image.repository="otel/opentelemetry-collector-k8s" \
+   --namespace opentelemetry
+  configure_opentelemetry
+}
+
+function install_kyverno() {
+  helm repo add kyverno https://kyverno.github.io/kyverno/
+  helm repo update
+  helm install kyverno kyverno/kyverno -n kyverno --create-namespace  
+}
+
+function install_gatekeeper() {
+  helm repo add gatekeeper https://open-policy-agent.github.io/gatekeeper/charts
+  helm install gatekeeper/gatekeeper --name-template=gatekeeper --namespace gatekeeper-system --create-namespace
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls -1| sort)
@@ -221,25 +275,25 @@ function allow_external_access() {
   SERVICE=$2
   EXTERNAL_PORT=$3
 
-  kubectl patch svc "$SERVICE" -n "$NAMESPACE" -p '{"spec": {"type": "NodePort"}}'
-  kubectl patch svc "$SERVICE" -n "$NAMESPACE" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/0/nodePort\", \"value\":$EXTERNAL_PORT}]"
+  kubectl patch svc "${SERVICE}" -n "${NAMESPACE}" -p '{"spec": {"type": "NodePort"}}'
+  kubectl patch svc "${SERVICE}" -n "${NAMESPACE}" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/0/nodePort\", \"value\":$EXTERNAL_PORT}]"
 }
 
 function wait_for_namespace() {
   NAMESPACE=$1
 
-  LINES=$(kubectl get pods -n "$NAMESPACE" | grep -v NAME | wc -l)
-  RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" | grep "1/1" | wc -l)
+  LINES=$(kubectl get pods -n "${NAMESPACE}" | grep -v NAME | wc -l)
+  RUNNING_LINES=$(kubectl get pods -n "${NAMESPACE}" | grep -E "1/1|2/2|3/3" | wc -l)
 
   while [[ "$LINES" != "$RUNNING_LINES" ]]
   do
-      echo "Lines: $LINES, Running lines: $RUNNING_LINES, wait for 10 seconds..."
+      echo "Namespace: ${NAMESPACE} Lines: ${LINES}, Running lines: ${RUNNING_LINES}, wait for 10 seconds..."
       sleep 10
-      kubectl get pods -n "$NAMESPACE"
-      LINES=$(kubectl get pods -n "$NAMESPACE" | grep -v NAME | wc -l)
-      RUNNING_LINES=$(kubectl get pods -n "$NAMESPACE" | grep "1/1" | wc -l)
+      kubectl get pods -n "${NAMESPACE}"
+      LINES=$(kubectl get pods -n "${NAMESPACE}" | grep -v NAME | wc -l)
+      RUNNING_LINES=$(kubectl get pods -n "${NAMESPACE}" | grep -E "1/1|2/2|3/3" | wc -l)
   done
-  echo "All pods in namespace $NAMESPACE are running, continue"
+  echo "All pods in namespace ${NAMESPACE} are running, continue"
 }
 
 function force_password_change() {
@@ -272,10 +326,17 @@ install_kgateway
 install_argocd
 install_external_secrets_operator
 install_crossplane
+install_prometheus_grafana
+install_jaeger
+install_opentelemetry
+install_kyverno
+install_gatekeeper
 echo "$(date +%H:%M:%S) Wait for deployments..."
 wait_for_namespace "crossplane-system"
 wait_for_namespace "external-secrets"
 wait_for_namespace "argocd"
+wait_for_namespace "monitoring"
+wait_for_namespace "jaeger"
 
 echo "$(date +%H:%M:%S) Continue with deployment of examples..."
 install_examples

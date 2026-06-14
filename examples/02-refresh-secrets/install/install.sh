@@ -49,7 +49,7 @@ argocd app create vault \
 
 argocd_wait_for_healty vault
 
-kubectl exec -i vault-0 -n vault -- /bin/sh <<EOF
+kubectl exec -i vault-0 -n vault -- /bin/sh <<'EOF'
 vault login root
 
 # Write the demo credentials

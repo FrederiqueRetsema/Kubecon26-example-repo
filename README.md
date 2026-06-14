@@ -36,4 +36,6 @@ The following portnumbers are used:
 | 30003       | 03-refresh-secrets-aws, SSM Parameters    |
 | 30007       | ArgoCD                                    |
 | 30008       | Keyvault (used in 02-refresh-secrets)     |
+| 30010       | Grafana                                   |
+| 30011       | Jaeger                                    |
 

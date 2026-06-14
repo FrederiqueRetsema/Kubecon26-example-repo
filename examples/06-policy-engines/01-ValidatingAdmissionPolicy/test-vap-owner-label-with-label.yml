@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-with-owner
+  labels:
+    owner: "conclusionxforce.cloud"
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
