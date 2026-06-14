@@ -11,7 +11,6 @@ function deploy() {
 
 kubectl create namespace 01-example-kgateway
 
-kubectl apply -f "${DIR}/cert-manager/issuer.yml"
-
 deploy "http-route"
+deploy "cert-manager"
 
