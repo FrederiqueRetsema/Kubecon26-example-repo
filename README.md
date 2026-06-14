@@ -19,6 +19,8 @@ You can go to the aws-deployment directory and copy the setenv.template.sh file 
 . ./start.sh
 ```
 
+You can log on using SSM Systems Manager, after that su to the kubernetes user. 
+
 When you looked around and played with this, you can delete the environment using:
 
 ```
@@ -27,15 +29,14 @@ When you looked around and played with this, you can delete the environment usin
 
 ## Port numbers
 
-The following portnumbers are used:
+Use any of the three nodes IP addresses with one of the following portnumbers:
 
-| Port number | Used for                                  |
-| ----------- | ----------------------------------------- |
-| 30001       | 02-refresh-secrets                        |
-| 30002       | 03-refresh-secrets-aws, AWS secretsmanager|
-| 30003       | 03-refresh-secrets-aws, SSM Parameters    |
-| 30007       | ArgoCD                                    |
-| 30008       | Keyvault (used in 02-refresh-secrets)     |
-| 30010       | Grafana                                   |
-| 30011       | Jaeger                                    |
-
+| Port number | Used for                                                                            |
+| ----------- | ----------------------------------------------------------------------------------- |
+| 30001       | 02-refresh-secrets                                                                  |
+| 30002       | 03-refresh-secrets-aws, AWS secretsmanager                                          |
+| 30003       | 03-refresh-secrets-aws, SSM Parameters                                              |
+| 30007       | ArgoCD (userid = admin, for password use `argocd admin initial-password -n argocd`) |
+| 30008       | Keyvault (used in 02-refresh-secrets), use "root" as token name                     |
+| 30010       | Grafana                                                                             |
+| 30011       | Jaeger                                                                              |
