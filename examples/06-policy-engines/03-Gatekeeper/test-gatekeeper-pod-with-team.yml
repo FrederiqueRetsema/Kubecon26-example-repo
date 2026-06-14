@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: test-with-team
+  name: test-with-team-gatekeeper
   labels:
     team: "conclusion-xforce"
 spec:

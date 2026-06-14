@@ -10,10 +10,10 @@ kubectl apply -f test-vap-privileged-pod.yml -n 06-policy-engines-vap           
 kubectl apply -f test-vap-privileged-pod.yml -n 06-policy-engines-no-policies     # will not fail
 
 kubectl apply -f test-vap-owner-label-no-label.yml -n 06-policy-engines-vap
-kubectl get pod test-no-owner-label -n 06-policy-engines-vap -o yaml              # label owner: example.com
+kubectl get pod test-no-owner-label-vap -n 06-policy-engines-vap -o yaml          # label owner: example.com
 
 kubectl apply -f test-vap-owner-label-with-label.yml -n 06-policy-engines-vap
-kubectl get pod test-pod-with-owner -n 06-policy-engines-vap -o yaml              # label owner: conclusionxforce.cloud
+kubectl get pod test-pod-with-owner-vap -n 06-policy-engines-vap -o yaml          # label owner: conclusionxforce.cloud
 ```
 
 ## Kyverno
@@ -23,9 +23,9 @@ kubectl apply -f test-kyverno-pod-without-team.yml -n 06-policy-engines-kyverno 
 kubectl apply -f test-kyverno-pod-without-team.yml -n 06-policy-engines-no-policies   # will not fail
 
 kubectl apply -f test-kyverno-pod-without-resources.yml -n 06-policy-engines-kyverno
-kubectl get pod test-pod-no-resources -n 06-policy-engines-kyverno -o yaml            # 50m/64Mi
+kubectl get pod test-pod-no-resources-kyverno -n 06-policy-engines-kyverno -o yaml    # 50m/64Mi
 kubectl apply -f test-kyverno-pod-with-resources.yml -n 06-policy-engines-kyverno
-kubectl get pod test-pod-with-resources -n 06-policy-engines-kyverno -o yaml          # 100m/128Mi
+kubectl get pod test-pod-with-resources-kyverno -n 06-policy-engines-kyverno -o yaml  # 100m/128Mi
 ```
 
 # Gatekeeper

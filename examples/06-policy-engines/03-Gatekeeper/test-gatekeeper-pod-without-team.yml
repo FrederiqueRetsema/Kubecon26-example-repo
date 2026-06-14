@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: test-no-team
+  name: test-no-team-gatekeeper
 spec:
   containers:
   - name: nginx
