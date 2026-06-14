@@ -207,6 +207,49 @@ function install_crossplane() {
     --set args='{"--enable-operations"}'
 }
 
+function install_prometheus_grafana() {
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  helm repo update
+  helm install kube-prometheus-stack \
+    prometheus-community/kube-prometheus-stack \
+    --namespace monitoring \
+    --create-namespace \
+    --set grafana.adminPassword='##DefaultPassword##'
+  allow_external_access monitoring kube-prometheus-stack-grafana 30010
+  allow_external_access monitoring kube-prometheus-stack-prometheus 30011
+}
+
+function install_jaeger() {
+  helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+  helm repo update
+  helm install jaeger \
+    jaegertracing/jaeger \
+    --namespace jaeger \
+    --create-namespace \
+    --set allInOne.enabled=true \
+    --set provisionDataStore.cassandra=false \
+    --set storage.type=memory \
+    --set agent.enabled=false \
+    --set collector.enabled=false \
+    --set query.enabled=false
+  allow_external_access jaeger jaeger-query 30012
+}
+
+function configure_opentelemetry() {
+  kubedtl delete configmap opentelemetry-collector-agent -n opentelemetry
+  kubectl create configmap opentelemetry-collector-agent --from-file=/opt/xforce/otel/05-opentelemetry.yaml --namespace opentelemetry
+  kubectl get pods -n opentelemetry | grep -v NAME | awk '{print "kubectl delete pod -n opentelemetry "$1}'|bash
+}
+
+function install_opentelemetry() {
+  kubectl create namespace opentelemetry
+  helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+  helm install opentelemetry-collector open-telemetry/opentelemetry-collector \
+   --set image.repository="otel/opentelemetry-collector-k8s" \
+   --namespace opentelemetry
+  configure_opentelemetry
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls -1| sort)
@@ -272,10 +315,15 @@ install_kgateway
 install_argocd
 install_external_secrets_operator
 install_crossplane
+install_prometheus_grafana
+install_jaeger
+install_opentelemetry
 echo "$(date +%H:%M:%S) Wait for deployments..."
 wait_for_namespace "crossplane-system"
 wait_for_namespace "external-secrets"
 wait_for_namespace "argocd"
+wait_for_namespace "monitoring"
+wait_for_namespace "jaeger"
 
 echo "$(date +%H:%M:%S) Continue with deployment of examples..."
 install_examples
