@@ -261,6 +261,10 @@ function install_gatekeeper() {
   helm install gatekeeper/gatekeeper --name-template=gatekeeper --namespace gatekeeper-system --create-namespace
 }
 
+function install_cert_manager() {
+  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.2/cert-manager.yaml
+}
+
 function install_examples() {
   cd /clone/$REPONAME/examples
   EXAMPLES=$(ls -1| sort)
@@ -331,6 +335,7 @@ install_jaeger
 install_opentelemetry
 install_kyverno
 install_gatekeeper
+install_cert_manager
 echo "$(date +%H:%M:%S) Wait for deployments..."
 wait_for_namespace "crossplane-system"
 wait_for_namespace "external-secrets"
