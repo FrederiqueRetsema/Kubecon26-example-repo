@@ -1,0 +1,9 @@
+# You would normally use a ClusterIssuer here, see https://cert-manager.io/docs/configuration/selfsigned/
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: 01-example-kgateway
+spec:
+  selfSigned: {}

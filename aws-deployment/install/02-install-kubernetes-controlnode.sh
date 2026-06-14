@@ -173,9 +173,9 @@ function install_cilium() {
 }
 
 function install_kgateway() {
-  helm install kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds --version v2.2.2 --namespace kgateway-system --create-namespace
-  helm install kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --version v2.2.2 --namespace kgateway-system --create-namespace
-  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+  helm install kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds --version v2.3.3 --namespace kgateway-system --create-namespace
+  helm install kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --version v2.3.3 --namespace kgateway-system --create-namespace
+  kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
 }
 
 function install_argocd() {                  
@@ -337,11 +337,15 @@ install_kyverno
 install_gatekeeper
 install_cert_manager
 echo "$(date +%H:%M:%S) Wait for deployments..."
-wait_for_namespace "crossplane-system"
-wait_for_namespace "external-secrets"
+wait_for_namespace "kgateway-system"
 wait_for_namespace "argocd"
+wait_for_namespace "external-secrets"
+wait_for_namespace "crossplane-system"
 wait_for_namespace "monitoring"
 wait_for_namespace "jaeger"
+wait_for_namespace "kyverno"
+wait_for_namespace "gatekeeper-system"
+wait_for_namespace "cert-manager"
 
 echo "$(date +%H:%M:%S) Continue with deployment of examples..."
 install_examples
