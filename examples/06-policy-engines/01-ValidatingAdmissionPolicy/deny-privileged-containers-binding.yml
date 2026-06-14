@@ -5,7 +5,7 @@ metadata:
 spec:
   policyName: deny-privileged-containers
   validationActions: [Deny, Audit]
-  matchResources
+  matchResources:
     namespaceSelector:
       matchExpressions:
       - key: policy-enforcement
@@ -14,4 +14,3 @@ spec:
       - key: example
         operator: In
         values: ["06-policy-engines"]
-        

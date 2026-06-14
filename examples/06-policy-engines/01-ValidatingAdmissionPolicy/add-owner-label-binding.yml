@@ -1,0 +1,15 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: add-owner-label-binding
+spec:
+  policyName: add-owner-label
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+      - key: policy-enforcement
+        operator: NotIn
+        values: ["disabled"]
+      - key: example
+        operator: In
+        values: ["06-policy-engines"]

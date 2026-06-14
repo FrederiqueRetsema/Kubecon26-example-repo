@@ -2,12 +2,12 @@
 
 NAMESPACE=06-policy-engines
 
-function deploy() {
-    SUBDIR=$1
+function load_scripts() {
+  DIR="/clone/Kubecon26-example-repo/examples/06-policy-engines/$1"
+  NAMESPACE=$2
 
-    DIR="/clone/Kubecon26-example-repo/examples/06-policy-engines"
-    cd $DIR
-
+  cd $DIR
+  ls -1 *yml | awk '{print "kubectl apply -n 03-example-refresh-secrets-aws -f "$1}' | bash
 }
 
 function create-namespace() {
@@ -18,8 +18,10 @@ function create-namespace() {
 }
 
 create-namespace "${NAMESPACE}"
-create-namespace "${NAMESPACE}-VAP"
-create-namespace "${NAMESPACE}-no-policies"
-kubectl label namespace "${NAME}-no-policies" policy-enforcement=disabled
+create-namespace "${NAMESPACE}-vap"
 
-deploy 01-ValidatingAdmissionPolicy
+create-namespace "${NAMESPACE}-no-policies"
+kubectl label namespace "${NAMESPACE}-no-policies" policy-enforcement=disabled
+
+load_scripts 01-ValidatingAdmissionPolicy "${NAMESPACE}-vap"
+
