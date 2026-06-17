@@ -101,6 +101,11 @@ function load_scripts_composition() {
     cd -
 }
 
+function install_xprin() {
+  curl -sL https://raw.githubusercontent.com/crossplane-contrib/xprin/main/install.sh | COMPRESSED=true VERIFY_SHA=true sh
+  mv xprin /usr/local/bin/
+}
+
 function install_python3() {
     apt install python3 -y
 }
@@ -131,6 +136,10 @@ function prepare_adamwg_demo() {
     install_python3
     install_crossplane_cli
     install_kind
+    install_xprin
+
+    cd /clone
+    git clone https://github.com/adamwg/kubecon-eu-2026-devex-demo.git
 }
 
 kubectl create namespace 04-crossplane
