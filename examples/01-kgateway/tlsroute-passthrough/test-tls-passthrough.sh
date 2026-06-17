@@ -36,7 +36,3 @@ openssl s_client -connect $GATEWAY_IP:443 -servername www.example2.com </dev/nul
 echo ""
 
 echo "=== Done ==="
-echo ""
-echo "Key difference from Terminate mode:"
-echo "  - In Terminate mode, the GATEWAY's certificate is presented to the client"
-echo "  - In Passthrough mode, the BACKEND's certificate is presented to the client"
