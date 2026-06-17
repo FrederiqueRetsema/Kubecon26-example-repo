@@ -16,4 +16,4 @@ spec:
     - "example.com"
   issuerRef:
     name: ca-issuer
-    kind: Issuer
+    kind: ClusterIssuer

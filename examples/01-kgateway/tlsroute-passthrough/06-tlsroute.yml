@@ -5,8 +5,8 @@ metadata:
   namespace: 01-kgateway-tlsroute-passthrough
 spec:
   hostnames:
-    - "www.example.com"
-    - "example.com"
+    - "www.example2.com"
+    - "example2.com"
   parentRefs:
     - name: tlsroute-passthrough-gateway
       namespace: kgateway-system

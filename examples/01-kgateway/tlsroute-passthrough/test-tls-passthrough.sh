@@ -22,17 +22,17 @@ echo ""
 
 # Test 1: Verify the BACKEND certificate is presented (not a gateway cert)
 echo "--- Test 1: Verify the backend certificate is presented (passthrough) ---"
-openssl s_client -connect $GATEWAY_IP:443 -servername www.example.com </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates
+openssl s_client -connect $GATEWAY_IP:443 -servername www.example2.com </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates
 echo ""
 
 # Test 2: Make a request through the passthrough gateway
 echo "--- Test 2: Make a request through the passthrough gateway ---"
-curl -k --resolve www.example.com:443:$GATEWAY_IP https://www.example.com:443 2>/dev/null
+curl -k --resolve www.example2.com:443:$GATEWAY_IP https://www.example2.com:443 2>/dev/null
 echo ""
 
 # Test 3: Show TLS connection details (should show backend's cert info)
 echo "--- Test 3: TLS connection details ---"
-openssl s_client -connect $GATEWAY_IP:443 -servername www.example.com </dev/null 2>&1 | grep -E "Protocol|Cipher|subject|issuer"
+openssl s_client -connect $GATEWAY_IP:443 -servername www.example2.com </dev/null 2>&1 | grep -E "Protocol|Cipher|subject|issuer"
 echo ""
 
 echo "=== Done ==="

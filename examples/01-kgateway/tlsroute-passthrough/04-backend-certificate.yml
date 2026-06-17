@@ -12,8 +12,8 @@ spec:
     algorithm: RSA
     size: 2048
   dnsNames:
-    - "www.example.com"
-    - "example.com"
+    - "www.example2.com"
+    - "example2.com"
   issuerRef:
     name: ca-issuer
-    kind: Issuer
+    kind: ClusterIssuer

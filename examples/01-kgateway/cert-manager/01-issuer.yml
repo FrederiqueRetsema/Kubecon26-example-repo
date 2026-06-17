@@ -1,9 +1,9 @@
-# You would normally use a ClusterIssuer here, see https://cert-manager.io/docs/configuration/selfsigned/
+# ClusterIssuer works across all namespaces
+# See: https://cert-manager.io/docs/configuration/selfsigned/
 
 apiVersion: cert-manager.io/v1
-kind: Issuer
+kind: ClusterIssuer
 metadata:
   name: selfsigned-issuer
-  namespace: kgateway-system
 spec:
   selfSigned: {}

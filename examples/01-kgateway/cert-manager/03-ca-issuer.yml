@@ -1,10 +1,11 @@
-# You would normally use a cluster issuer here, see: https://cert-manager.io/docs/configuration/selfsigned/
+# ClusterIssuer backed by our self-signed CA
+# Can issue certificates in any namespace
+# See: https://cert-manager.io/docs/configuration/selfsigned/
 
 apiVersion: cert-manager.io/v1
-kind: Issuer
+kind: ClusterIssuer
 metadata:
   name: ca-issuer
-  namespace: kgateway-system
 spec:
   ca:
     secretName: root-secret
