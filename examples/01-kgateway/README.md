@@ -5,10 +5,10 @@ Slides can be found here: https://hosted-files.sched.co/kccnceu2026/be/Bridging+
 
 Pod > Service > HTTPRoute > ListenerSet > Gateway
 
-You can test the example via the following commands:
+You can test the example in http-route via the following commands:
 
 ```
-kubectl port-forward deployment/my-http -n kgateway-system 8080:8080 &
+kubectl port-forward deployment/http-gateway -n kgateway-system 8080:8080 &
 
 curl localhost:8080 -H "host: www.example2.com:8080"
 ```
