@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-tls-config
+  namespace: 01-kgateway-tlsroute
+data:
+  default.conf: |
+    server {
+        listen 443 ssl;
+        server_name www.example.com example.com;
+
+        ssl_certificate /etc/nginx/ssl/tls.crt;
+        ssl_certificate_key /etc/nginx/ssl/tls.key;
+
+        location / {
+            return 200 'Hello from TLS passthrough backend!\n';
+            add_header Content-Type text/plain;
+        }
+    }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-tls
+  namespace: 01-kgateway-tlsroute
+  labels:
+    app.kubernetes.io/name: nginx-tls
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
+    ports:
+    - containerPort: 443
+    volumeMounts:
+    - name: tls-cert
+      mountPath: /etc/nginx/ssl
+      readOnly: true
+    - name: nginx-config
+      mountPath: /etc/nginx/conf.d
+  volumes:
+  - name: tls-cert
+    secret:
+      secretName: passthrough-backend-cert-secret
+  - name: nginx-config
+    configMap:
+      name: nginx-tls-config
