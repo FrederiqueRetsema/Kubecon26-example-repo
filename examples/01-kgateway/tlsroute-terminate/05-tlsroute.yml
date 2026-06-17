@@ -1,0 +1,14 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: my-tls-route
+  namespace: 01-example-kgateway
+spec:
+  parentRefs:
+    - name: my-tls-gateway
+      namespace: kgateway-system
+      sectionName: tls-terminate
+  rules:
+    - backendRefs:
+        - name: my-service
+          port: 1234

@@ -1,0 +1,27 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: kgateway-system
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tls-terminate-cert
+  namespace: kgateway-system
+spec:
+  secretName: tls-terminate-cert-secret
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  dnsNames:
+    - "www.example.com"
+    - "example.com"
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer

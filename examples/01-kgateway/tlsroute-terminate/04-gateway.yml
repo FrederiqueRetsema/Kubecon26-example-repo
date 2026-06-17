@@ -1,0 +1,19 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: my-tls-gateway
+  namespace: kgateway-system
+spec:
+  gatewayClassName: kgateway
+  listeners:
+    - name: tls-terminate
+      protocol: TLS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: tls-terminate-cert-secret
+            kind: Secret
+      allowedRoutes:
+        namespaces:
+          from: All
