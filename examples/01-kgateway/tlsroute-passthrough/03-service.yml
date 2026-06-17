@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx-tls-service
-  namespace: 01-kgateway-tlsroute
+  namespace: 01-kgateway-tlsroute-passthrough
 spec:
   selector:
     app.kubernetes.io/name: nginx-tls

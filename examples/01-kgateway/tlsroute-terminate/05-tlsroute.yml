@@ -2,7 +2,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
   name: tls-route-terminate
-  namespace: 01-kgateway-tlsroute
+  namespace: 01-kgateway-tlsroute-terminate
 spec:
   hostnames:
     - "www.example.com"

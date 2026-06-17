@@ -12,6 +12,7 @@ function deploy() {
 kubectl create namespace 01-kgateway
 kubectl create namespace 01-kgateway-http-route
 kubectl create namespace 01-kgateway-tlsroute-terminate
+kubectl create namespace 01-kgateway-tlsroute-passthrough
 
 deploy "http-route"
 deploy "cert-manager"

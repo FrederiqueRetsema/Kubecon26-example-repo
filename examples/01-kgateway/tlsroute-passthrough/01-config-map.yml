@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-tls-config
+  namespace: 01-kgateway-tlsroute-passthrough
+data:
+  default.conf: |
+    server {
+        listen 443 ssl;
+        server_name www.example.com example.com;
+
+        ssl_certificate /etc/nginx/ssl/tls.crt;
+        ssl_certificate_key /etc/nginx/ssl/tls.key;
+
+        location / {
+            return 200 'Hello from TLS passthrough backend!\n';
+            add_header Content-Type text/plain;
+        }
+    }
