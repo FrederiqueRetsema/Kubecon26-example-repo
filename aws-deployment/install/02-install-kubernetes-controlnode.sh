@@ -207,6 +207,12 @@ function install_crossplane() {
     --set args='{"--enable-operations"}'
 }
 
+function install_docker() {
+  apt update
+  apt install docker.io -y
+  usermod -aG docker kubernetes
+}
+
 function install_prometheus_grafana() {
   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
   helm repo update
@@ -330,6 +336,7 @@ install_kgateway
 install_argocd
 install_external_secrets_operator
 install_crossplane
+install_docker
 install_prometheus_grafana
 install_jaeger
 install_opentelemetry
