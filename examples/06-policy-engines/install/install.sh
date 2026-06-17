@@ -7,7 +7,7 @@ function load_scripts() {
   NAMESPACE=$2
 
   cd $DIR
-  ls -1 *yml | awk '{print "kubectl apply -n 03-example-refresh-secrets-aws -f "$1}' | bash
+  ls -1 *yml | awk '{print "kubectl apply -n 03-refresh-secrets-aws -f "$1}' | bash
 }
 
 function create-namespace() {

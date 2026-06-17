@@ -4,7 +4,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: ca-issuer
-  namespace: 01-example-kgateway
+  namespace: 01-kgateway
 spec:
   ca:
     secretName: root-secret

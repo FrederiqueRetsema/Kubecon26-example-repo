@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: my-service
-  namespace: 01-example-kgateway
+  namespace: 01-kgateway
 spec:
   selector:
     app.kubernetes.io/name: MyApp

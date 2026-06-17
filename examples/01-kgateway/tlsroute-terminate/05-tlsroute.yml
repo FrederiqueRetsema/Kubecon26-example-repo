@@ -2,7 +2,7 @@ apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TLSRoute
 metadata:
   name: my-tls-route
-  namespace: 01-example-kgateway
+  namespace: 01-kgateway
 spec:
   parentRefs:
     - name: my-tls-gateway
