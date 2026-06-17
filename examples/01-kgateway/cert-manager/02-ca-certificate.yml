@@ -2,7 +2,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: selfsigned-ca
-  namespace: 01-example-kgateway
+  namespace: cert-manager
 spec:
   isCA: true
   commonName: selfsigned-ca
@@ -12,5 +12,5 @@ spec:
     size: 256
   issuerRef:
     name: selfsigned-issuer
-    kind: Issuer
+    kind: ClusterIssuer
     group: cert-manager.io

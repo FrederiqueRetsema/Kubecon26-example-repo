@@ -9,8 +9,11 @@ function deploy() {
     ls -1 *.yml | sort | awk '{print "kubectl apply -f "$1}'| bash
 }
 
-kubectl create namespace 01-example-kgateway
+kubectl create namespace 01-kgateway-http-route
+kubectl create namespace 01-kgateway-tlsroute-terminate
+kubectl create namespace 01-kgateway-tlsroute-passthrough
 
 deploy "http-route"
 deploy "cert-manager"
-
+deploy "tlsroute-terminate"
+deploy "tlsroute-passthrough"
