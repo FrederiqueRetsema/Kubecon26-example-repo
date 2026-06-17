@@ -186,8 +186,8 @@ Resources:
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
                 find . -type f -exec sed -i 's/##AWS-Region##/'${AWS::Region}'/g' {} \;
-              '/opt/xforce/otel/05-opentelemetry.yaml':
-                content: |
+            '/opt/xforce/otel/05-opentelemetry.yaml':
+              content: |
                   # This is what you get by default when you use the following helm values:
                   #
                   # mode: daemonset

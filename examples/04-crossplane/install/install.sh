@@ -1,5 +1,7 @@
 #!/bin/bash
 
+MAIN_DIR="/clone/Kubecon26-example-repo/examples/04-crossplane/"
+
 function get_access_key_from_secret() {
   SECRET_ID=$1
 
@@ -89,7 +91,7 @@ deploy() {
 }
 
 function load_scripts_composition() {
-    DIR="/clone/Kubecon26-example-repo/examples/04-crossplane/composition"
+    DIR="${MAIN_DIR}/composition"
     cd $DIR
 
     deploy "01-fn.yml"          5 "health"      "True"     3
@@ -99,9 +101,42 @@ function load_scripts_composition() {
     cd -
 }
 
+function install_python3() {
+    apt install python3 -y
+}
+
+function install_crossplane_cli() {
+    cd /clone    
+    git clone https://github.com/crossplane/cli  
+
+    cd /clone/cli
+    go install ./cmd/crossplane
+    PATH=$PATH:/home/kubernetes/go/bin
+    echo "export PATH=$PATH:/home/kubernetes/go/bin" >> /home/kubernetes/.bashrc 
+
+    mv /root/go ~kubernetes
+    chown kubernetes:kubernetes ~kubernetes/go
+}
+
+function install_kind() {
+    # For AMD64 / x86_64
+    [ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+    # For ARM64
+    [ $(uname -m) = aarch64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-arm64
+    chmod +x ./kind
+    sudo mv ./kind /usr/local/bin/kind
+}
+
+function prepare_adamwg_demo() {
+    install_python3
+    install_crossplane_cli
+    install_kind
+}
+
 kubectl create namespace 04-crossplane
 install_aws_secrets
 
 # Only load scripts that don't create AWS resources (they will stay in AWS when
 # you delete the cluster without deleting the resources within Kubernetes first)
 load_scripts_composition
+prepare_adamwg_demo
