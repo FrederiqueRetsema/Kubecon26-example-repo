@@ -242,7 +242,7 @@ function install_jaeger() {
 }
 
 function configure_opentelemetry() {
-  kubedtl delete configmap opentelemetry-collector-agent -n opentelemetry
+  kubectl delete configmap opentelemetry-collector-agent -n opentelemetry
   kubectl create configmap opentelemetry-collector-agent --from-file=/opt/xforce/otel/05-opentelemetry.yaml --namespace opentelemetry
   kubectl get pods -n opentelemetry | grep -v NAME | awk '{print "kubectl delete pod -n opentelemetry "$1}'|bash
 }
@@ -252,8 +252,14 @@ function install_opentelemetry() {
   helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
   helm install opentelemetry-collector open-telemetry/opentelemetry-collector \
    --set image.repository="otel/opentelemetry-collector-k8s" \
+   --set mode=daemonset \
    --namespace opentelemetry
   configure_opentelemetry
+}
+
+function install_opentelemetry_ebpf_instrumentation() {
+  # helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+  helm install opentelemetry-ebpf-instrumentation open-telemetry/opentelemetry-ebpf-instrumentation
 }
 
 function install_kyverno() {
@@ -340,6 +346,7 @@ install_docker
 install_prometheus_grafana
 install_jaeger
 install_opentelemetry
+install_opentelemetry_ebpf_instrumentation
 install_kyverno
 install_gatekeeper
 install_cert_manager

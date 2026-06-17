@@ -9,7 +9,7 @@ then
 fi
 
 echo "Stackname=${STACKNAME}"
-echo "Deploy started at $(date +%H:%M:%S), it will take about 15 minutes to finish"
+echo "Deploy started at $(date +%H:%M:%S), it will take about 20 minutes to finish"
 
 aws cloudformation deploy --stack-name "${STACKNAME}" --template-file "./cloudformation.yaml" --parameter-overrides ConsultantName="${CONSULTANT_NAME}" BranchName="${BRANCH_NAME}" DeleteStackAutomatically="${DELETE_STACK_AUTOMATICALLY}" DeleteStackAfterHours="${DELETE_STACK_AFTER_HOURS}" --capabilities "CAPABILITY_NAMED_IAM" --s3-bucket "${BUCKET_NAME}" --profile "${PROFILE}"
 
