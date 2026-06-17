@@ -101,6 +101,10 @@ function load_scripts_composition() {
     cd -
 }
 
+function install_python3() {
+    apt install python3 -y
+}
+
 function install_crossplane_cli() {
     cd /clone    
     git clone https://github.com/crossplane/cli  
@@ -109,6 +113,9 @@ function install_crossplane_cli() {
     go install ./cmd/crossplane
     PATH=$PATH:/home/kubernetes/go/bin
     echo "export PATH=$PATH:/home/kubernetes/go/bin" >> /home/kubernetes/.bashrc 
+
+    mv /root/go ~kubernetes
+    chown kubernetes:kubernetes ~kubernetes/go
 }
 
 function install_kind() {
@@ -121,6 +128,7 @@ function install_kind() {
 }
 
 function prepare_adamwg_demo() {
+    install_python3
     install_crossplane_cli
     install_kind
 }
