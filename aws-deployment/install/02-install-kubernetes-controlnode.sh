@@ -259,7 +259,11 @@ function install_opentelemetry() {
 
 function install_opentelemetry_ebpf_instrumentation() {
   # helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-  helm install opentelemetry-ebpf-instrumentation open-telemetry/opentelemetry-ebpf-instrumentation
+  helm install opentelemetry-ebpf-instrumentation open-telemetry/opentelemetry-ebpf-instrumentation \
+    --namespace opentelemetry \
+    --set endpoint.address=opentelemetry-collector.opentelemetry.svc.cluster.local \
+    --set endpoint.port=4317 \
+    --set endpoint.insecure=true
 }
 
 function install_kyverno() {

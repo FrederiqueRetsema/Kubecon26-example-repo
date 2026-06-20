@@ -208,6 +208,8 @@ Resources:
                   # - extra prometheus exporter
                   exporters:
                     debug: {}
+                    otlphttp/jaeger:
+                      endpoint: "http://jaeger-collector.jaeger.svc.cluster.local:4318"
                     prometheusremotewrite:
                       endpoint: "https://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/write"
                       resource_to_telemetry_conversion:
@@ -382,6 +384,7 @@ Resources:
                       traces:
                         exporters:
                         - debug
+                        - otlphttp/jaeger
                         processors:
                         - k8sattributes
                         - memory_limiter
