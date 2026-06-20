@@ -39,4 +39,5 @@ Use any of the three nodes IP addresses with one of the following portnumbers:
 | 30007       | ArgoCD (userid = admin, for password use `argocd admin initial-password -n argocd`) |
 | 30008       | Keyvault (used in 02-refresh-secrets), use "root" as token name                     |
 | 30010       | Grafana                                                                             |
-| 30011       | Jaeger                                                                              |
+| 30011       | Prometheus                                                                          |
+| 30012       | Jaeger                                                                              |
