@@ -220,7 +220,8 @@ function install_prometheus_grafana() {
     prometheus-community/kube-prometheus-stack \
     --namespace monitoring \
     --create-namespace \
-    --set grafana.adminPassword='##DefaultPassword##'
+    --set grafana.adminPassword='##DefaultPassword##' \
+    --set prometheus.prometheusSpec.enableRemoteWriteReceiver=true
   allow_external_access monitoring kube-prometheus-stack-grafana 30010
   allow_external_access monitoring kube-prometheus-stack-prometheus 30011
 }
@@ -238,22 +239,41 @@ function install_jaeger() {
     --set agent.enabled=false \
     --set collector.enabled=false \
     --set query.enabled=false
-  allow_external_access jaeger jaeger-query 30012
+  allow_external_access jaeger jaeger 30012 10
 }
 
 function configure_opentelemetry() {
-  kubedtl delete configmap opentelemetry-collector-agent -n opentelemetry
-  kubectl create configmap opentelemetry-collector-agent --from-file=/opt/xforce/otel/05-opentelemetry.yaml --namespace opentelemetry
-  kubectl get pods -n opentelemetry | grep -v NAME | awk '{print "kubectl delete pod -n opentelemetry "$1}'|bash
+  kubectl delete configmap opentelemetry-collector-agent -n opentelemetry
+  kubectl create configmap opentelemetry-collector-agent --from-file=relay=/opt/xforce/otel/05-opentelemetry.yaml --namespace opentelemetry
+  kubectl get pods -n opentelemetry | grep -v NAME | awk '{print "kubectl delete pod -n opentelemetry "$1" --force"}'|bash
 }
 
 function install_opentelemetry() {
   kubectl create namespace opentelemetry
   helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
   helm install opentelemetry-collector open-telemetry/opentelemetry-collector \
-   --set image.repository="otel/opentelemetry-collector-k8s" \
+   --set image.repository="otel/opentelemetry-collector-contrib" \
+   --set mode=daemonset \
+   --set service.enabled=true \
+   --set presets.logsCollection.enabled=true \
+   --set presets.kubernetesAttributes.enabled=true \
+   --set presets.kubernetesEvents.enabled=true \
+   --set presets.kubeletMetrics.enabled=true \
+   --set presets.hostMetrics.enabled=true \
+   --set resources.limits.memory=512Mi \
+   --set resources.limits.cpu=500m \
+   --set resources.requests.memory=128Mi \
+   --set resources.requests.cpu=100m \
    --namespace opentelemetry
   configure_opentelemetry
+}
+
+function install_opentelemetry_ebpf_instrumentation() {
+  # helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+  helm install opentelemetry-ebpf-instrumentation open-telemetry/opentelemetry-ebpf-instrumentation \
+    --namespace opentelemetry \
+    -f /opt/xforce/otel/ebpf-values.yaml
+  kubectl apply -f /opt/xforce/otel/opentelemetry-collector-service.yaml
 }
 
 function install_kyverno() {
@@ -284,9 +304,10 @@ function allow_external_access() {
   NAMESPACE=$1
   SERVICE=$2
   EXTERNAL_PORT=$3
+  PORT_INDEX=${4:-0}
 
   kubectl patch svc "${SERVICE}" -n "${NAMESPACE}" -p '{"spec": {"type": "NodePort"}}'
-  kubectl patch svc "${SERVICE}" -n "${NAMESPACE}" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/0/nodePort\", \"value\":$EXTERNAL_PORT}]"
+  kubectl patch svc "${SERVICE}" -n "${NAMESPACE}" --type json -p "[{\"op\": \"add\", \"path\": \"/spec/ports/$PORT_INDEX/nodePort\", \"value\":$EXTERNAL_PORT}]"
 }
 
 function wait_for_namespace() {
@@ -340,6 +361,7 @@ install_docker
 install_prometheus_grafana
 install_jaeger
 install_opentelemetry
+install_opentelemetry_ebpf_instrumentation
 install_kyverno
 install_gatekeeper
 install_cert_manager

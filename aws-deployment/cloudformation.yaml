@@ -186,34 +186,47 @@ Resources:
                 # Change variables in the scripts by values in the CloudFormation template
                 find . -type f -exec sed -i 's/##DefaultPassword##/'${DefaultPassword}'/g' {} \;
                 find . -type f -exec sed -i 's/##AWS-Region##/'${AWS::Region}'/g' {} \;
+            '/opt/xforce/otel/ebpf-values.yaml':
+              content: |
+                config:
+                  data:
+                    otel_traces_export:
+                      endpoint: "http://opentelemetry-collector.opentelemetry.svc.cluster.local:4317"
+                    otel_metrics_export:
+                      endpoint: "http://opentelemetry-collector.opentelemetry.svc.cluster.local:4318"
+                    network:
+                      enable: true
+                podAnnotations:
+                  prometheus.io/scrape: "true"
+                  prometheus.io/port: "9090"
+                  prometheus.io/path: "/metrics"
+            '/opt/xforce/otel/opentelemetry-collector-service.yaml':
+              content: |
+                apiVersion: v1
+                kind: Service
+                metadata:
+                  name: opentelemetry-collector
+                  namespace: opentelemetry
+                spec:
+                  selector:
+                    app.kubernetes.io/name: opentelemetry-collector
+                  ports:
+                    - name: otlp-grpc
+                      port: 4317
+                      targetPort: 4317
+                    - name: otlp-http
+                      port: 4318
+                      targetPort: 4318
             '/opt/xforce/otel/05-opentelemetry.yaml':
               content: |
-                  # This is what you get by default when you use the following helm values:
-                  #
-                  # mode: daemonset
-                  # presets:
-                  #   logsCollection:
-                  #     enabled: true
-                  #   kubernetesAttributes:
-                  #     enabled: true
-                  #   kubernetesEvents:
-                  #     enabled: true
-                  #   kubeletMetrics:
-                  #     enabled: true
-                  #   hostMetrics:
-                  #     enabled: true
-                  #
-                  # I added:
-                  # - insecure_skip_verify: true for kubeletstats
-                  # - extra prometheus exporter
                   exporters:
                     debug: {}
+                    otlphttp/jaeger:
+                      endpoint: "http://jaeger.jaeger.svc.cluster.local:4318"
                     prometheusremotewrite:
-                      endpoint: "https://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/write"
+                      endpoint: "http://prometheus-operated.monitoring.svc.cluster.local:9090/api/v1/write"
                       resource_to_telemetry_conversion:
                         enabled: true
-                      tls:
-                        insecure: true
                   extensions:
                     health_check:
                       endpoint: ${env:MY_POD_IP}:13133
@@ -382,6 +395,7 @@ Resources:
                       traces:
                         exporters:
                         - debug
+                        - otlphttp/jaeger
                         processors:
                         - k8sattributes
                         - memory_limiter
