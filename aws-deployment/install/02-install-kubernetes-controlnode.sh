@@ -220,7 +220,8 @@ function install_prometheus_grafana() {
     prometheus-community/kube-prometheus-stack \
     --namespace monitoring \
     --create-namespace \
-    --set grafana.adminPassword='##DefaultPassword##'
+    --set grafana.adminPassword='##DefaultPassword##' \
+    --set prometheus.prometheusSpec.enableRemoteWriteReceiver=true
   allow_external_access monitoring kube-prometheus-stack-grafana 30010
   allow_external_access monitoring kube-prometheus-stack-prometheus 30011
 }
@@ -244,7 +245,7 @@ function install_jaeger() {
 function configure_opentelemetry() {
   kubectl delete configmap opentelemetry-collector-agent -n opentelemetry
   kubectl create configmap opentelemetry-collector-agent --from-file=relay=/opt/xforce/otel/05-opentelemetry.yaml --namespace opentelemetry
-  kubectl get pods -n opentelemetry | grep -v NAME | awk '{print "kubectl delete pod -n opentelemetry "$1" --force}'|bash
+  kubectl get pods -n opentelemetry | grep -v NAME | awk '{print "kubectl delete pod -n opentelemetry "$1" --force"}'|bash
 }
 
 function install_opentelemetry() {
@@ -254,6 +255,11 @@ function install_opentelemetry() {
    --set image.repository="otel/opentelemetry-collector-contrib" \
    --set mode=daemonset \
    --set service.enabled=true \
+   --set presets.logsCollection.enabled=true \
+   --set presets.kubernetesAttributes.enabled=true \
+   --set presets.kubernetesEvents.enabled=true \
+   --set presets.kubeletMetrics.enabled=true \
+   --set presets.hostMetrics.enabled=true \
    --set resources.limits.memory=512Mi \
    --set resources.limits.cpu=500m \
    --set resources.requests.memory=128Mi \

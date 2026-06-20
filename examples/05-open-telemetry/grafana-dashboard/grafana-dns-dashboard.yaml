@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dns-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  dns-ebpf.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "links": [],
+      "panels": [
+        {
+          "title": "DNS Requests per Pod (eBPF)",
+          "type": "table",
+          "gridPos": {"h": 12, "w": 24, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {
+              "expr": "sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_count)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"k8s_pod_name": "Pod", "dns_question_name": "DNS Name", "Value": "Request Count"}}}
+          ],
+          "fieldConfig": {
+            "defaults": {"custom": {"align": "auto"}},
+            "overrides": [
+              {"matcher": {"id": "byName", "options": "Request Count"}, "properties": [{"id": "custom.width", "value": 150}]}
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [{"desc": true, "displayName": "Request Count"}]
+          }
+        },
+        {
+          "title": "DNS Lookup Duration per Pod (eBPF)",
+          "type": "barchart",
+          "gridPos": {"h": 12, "w": 24, "x": 0, "y": 12},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [
+            {
+              "expr": "sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_sum) / sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_count)",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"k8s_pod_name": "Pod", "dns_question_name": "DNS Name", "Value": "Avg Duration (s)"}}},
+            {"id": "calculateField", "options": {"mode": "binary", "fieldName": "Label", "reduce": {"reducer": "sum"}, "binary": {"left": "Pod", "operator": "+", "right": "DNS Name"}, "replaceFields": false}},
+            {"id": "sortBy", "options": {"sort": [{"field": "Avg Duration (s)", "desc": true}]}}
+          ],
+          "fieldConfig": {
+            "defaults": {"unit": "s", "color": {"mode": "palette-classic"}},
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "showValue": "always",
+            "barWidth": 0.7,
+            "groupWidth": 0.7,
+            "legend": {"displayMode": "list", "placement": "bottom"},
+            "tooltip": {"mode": "single"}
+          }
+        }
+      ],
+      "schemaVersion": 39,
+      "title": "DNS Requests (eBPF)",
+      "uid": "dns-ebpf-dashboard",
+      "version": 5
+    }
