@@ -17,7 +17,6 @@ data:
           "title": "DNS Requests per Pod (eBPF)",
           "type": "table",
           "gridPos": {"h": 12, "w": 24, "x": 0, "y": 0},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
           "targets": [
             {
               "expr": "sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_count)",
@@ -41,37 +40,32 @@ data:
         },
         {
           "title": "DNS Lookup Duration per Pod (eBPF)",
-          "type": "barchart",
-          "gridPos": {"h": 12, "w": 24, "x": 0, "y": 12},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "type": "table",
+          "gridPos": {"h": 16, "w": 24, "x": 0, "y": 12},
           "targets": [
             {
-              "expr": "sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_sum) / sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_count)",
+              "expr": "sort_desc(sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_sum) / sum by (k8s_pod_name, dns_question_name) (dns_lookup_duration_seconds_count))",
               "format": "table",
               "instant": true
             }
           ],
           "transformations": [
-            {"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"k8s_pod_name": "Pod", "dns_question_name": "DNS Name", "Value": "Avg Duration (s)"}}},
-            {"id": "calculateField", "options": {"mode": "binary", "fieldName": "Label", "reduce": {"reducer": "sum"}, "binary": {"left": "Pod", "operator": "+", "right": "DNS Name"}, "replaceFields": false}},
-            {"id": "sortBy", "options": {"sort": [{"field": "Avg Duration (s)", "desc": true}]}}
+            {"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"k8s_pod_name": "Pod", "dns_question_name": "DNS Name", "Value": "Avg Duration (s)"}}}
           ],
           "fieldConfig": {
-            "defaults": {"unit": "s", "color": {"mode": "palette-classic"}},
-            "overrides": []
+            "defaults": {"unit": "s", "decimals": 4, "custom": {"align": "auto", "cellOptions": {"type": "gauge", "mode": "gradient"}, "inspect": true}, "color": {"mode": "fixed", "fixedColor": "green"}, "min": 0},
+            "overrides": [
+              {"matcher": {"id": "byName", "options": "Pod"}, "properties": [{"id": "custom.width", "value": 400}, {"id": "custom.cellOptions", "value": {"type": "auto"}}]}
+            ]
           },
           "options": {
-            "orientation": "horizontal",
-            "showValue": "always",
-            "barWidth": 0.7,
-            "groupWidth": 0.7,
-            "legend": {"displayMode": "list", "placement": "bottom"},
-            "tooltip": {"mode": "single"}
+            "showHeader": true,
+            "sortBy": [{"desc": true, "displayName": "Avg Duration (s)"}]
           }
         }
       ],
       "schemaVersion": 39,
       "title": "DNS Requests (eBPF)",
       "uid": "dns-ebpf-dashboard",
-      "version": 5
+      "version": 7
     }
