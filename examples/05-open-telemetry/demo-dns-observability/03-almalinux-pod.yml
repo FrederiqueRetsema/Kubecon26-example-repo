@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: almalinux
+  namespace: 05-opentelemetry
+  labels:
+    app.kubernetes.io/name: almalinux
+spec:
+  containers:
+  - name: dns-client-container
+    image: golang:1.24
+    command:
+    - bash
+    - -c
+    - |
+      cat > /tmp/main.go << 'EOF'
+      package main
+
+      import (
+        "context"
+        "fmt"
+        "net"
+        "net/http"
+        "time"
+      )
+
+      func main() {
+        targets := []string{
+          "http://nginx-service",
+          "http://nginx-service.05-opentelemetry",
+          "http://nginx-service.05-opentelemetry.svc.cluster.local",
+        }
+        interval := 10 * time.Second
+
+        // Use a custom resolver to disable caching
+        resolver := &net.Resolver{}
+        dialer := &net.Dialer{
+          Resolver: resolver,
+        }
+        transport := &http.Transport{
+          DialContext: dialer.DialContext,
+          DisableKeepAlives: true,
+        }
+        client := &http.Client{
+          Transport: transport,
+          Timeout:   5 * time.Second,
+        }
+
+        fmt.Println("DNS client starting")
+        for {
+          for _, target := range targets {
+            // Force a fresh DNS lookup by resolving explicitly
+            resp, err := client.Get(target)
+            if err != nil {
+              fmt.Printf("[%s] %s -> Error: %v\n", time.Now().Format("15:04:05"), target, err)
+            } else {
+              fmt.Printf("[%s] %s -> %d\n", time.Now().Format("15:04:05"), target, resp.StatusCode)
+              resp.Body.Close()
+            }
+          }
+
+          // Also resolve a non-existent service to show failed lookups
+          ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+          _, err := resolver.LookupHost(ctx, "nonexistent-service")
+          if err != nil {
+            fmt.Printf("[%s] nonexistent-service -> DNS error (expected): %v\n", time.Now().Format("15:04:05"), err)
+          }
+          cancel()
+
+          time.Sleep(interval)
+        }
+      }
+      EOF
+      cd /tmp && CGO_ENABLED=0 go build -o dns-client main.go && exec ./dns-client

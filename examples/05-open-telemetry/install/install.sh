@@ -10,3 +10,4 @@ function load_scripts() {
 }
 
 load_scripts grafana-dashboard
+kubectl create namespace 05-opentelemetry

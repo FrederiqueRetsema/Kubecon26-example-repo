@@ -67,5 +67,5 @@ data:
       "schemaVersion": 39,
       "title": "DNS Requests (eBPF)",
       "uid": "dns-ebpf-dashboard",
-      "version": 7
+      "version": 10
     }
