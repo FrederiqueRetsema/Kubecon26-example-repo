@@ -196,6 +196,8 @@ Resources:
                       endpoint: "http://opentelemetry-collector.opentelemetry.svc.cluster.local:4318"
                     network:
                       enable: true
+                    dns:
+                      enable: true
                 podAnnotations:
                   prometheus.io/scrape: "true"
                   prometheus.io/port: "9090"
